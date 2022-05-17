@@ -1,11 +1,14 @@
-from src.KoreBeta.main import agent
+from src.Alpha.main import agent as Alpha
+from src.KoreBeta.main import agent as KoreBeta
 from datetime import datetime
 from kaggle_environments import make
 
 env = make("kore_fleets")
-env.run([agent, agent])
+env.run([Alpha, KoreBeta])
 
+now = datetime.now()
+file_name = now.strftime("games/game_%m-%d_%H:%M:%S.html")
 game_out = env.render(mode="html")
-with open("game_out.html", "w") as f:
+with open(file_name, "w") as f:
     f.write(game_out)
  
