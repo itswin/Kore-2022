@@ -19,6 +19,9 @@ class _FileHandler(logging.FileHandler):
 
 
 def init_logger(_logger):
+    if not LOGGING_ENABLED:
+        return
+
     if not IS_KAGGLE:
         if os.path.exists(FILE):
             os.remove(FILE)

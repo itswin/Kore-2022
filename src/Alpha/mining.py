@@ -28,6 +28,10 @@ def mine(agent: Player):
 
     safety = False
     my_ship_count = agent.ship_count
+
+    if my_ship_count < 21:
+        return
+
     op_ship_count = max(x.ship_count for x in agent.opponents)
     if my_ship_count < 2 * op_ship_count:
         safety = True
