@@ -23,8 +23,8 @@ else:
 
 
 def agent(obs, conf):
-    if obs["step"] == 0:
-        init_logger(logger)
+    # if obs["step"] == 0:
+    #     init_logger(logger)
 
     board = Board(obs, conf)
     step = board.step

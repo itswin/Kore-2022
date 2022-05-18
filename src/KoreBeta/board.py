@@ -511,8 +511,6 @@ class Board:
     def __init__(self, obs, conf):
         self._conf = Configuration(conf)
         self._step = obs["step"]
-        print("KoreBeta board", self._step)
-        logger.info(f"KoreBeta board{self._step}>")
 
         global _FIELD
         if _FIELD is None or self._step == 0:
