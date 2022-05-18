@@ -1,7 +1,6 @@
 import random
 import numpy as np
 import os
-from collections import defaultdict
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
@@ -26,14 +25,13 @@ class _ShipyardTarget:
         self.point = shipyard.point
         self.expected_profit = self._estimate_profit()
         self.reinforcement_distance = self._get_reinforcement_distance()
-        self._future_ship_count = self._estimate_future_ship_count()
         self.total_incoming_power = self._get_total_incoming_power()
 
     def __repr__(self):
         return f"Target {self.shipyard}"
 
     def estimate_shipyard_power(self, time):
-        return self._future_ship_count[time]
+        return self.shipyard.estimate_shipyard_power(time)
 
     def _get_total_incoming_power(self):
         return sum(x.ship_count for x in self.shipyard.incoming_allied_fleets)
@@ -53,36 +51,6 @@ class _ShipyardTarget:
         )
         profit += spawn_cost * board.shipyard_cost
         return profit
-
-    def _estimate_future_ship_count(self):
-        shipyard = self.shipyard
-        player = shipyard.player
-        board = shipyard.board
-
-        time_to_fleet_kore = defaultdict(int)
-        for sh in player.shipyards:
-            for f in sh.incoming_allied_fleets:
-                time_to_fleet_kore[len(f.route)] += f.expected_kore()
-
-        shipyard_reinforcements = defaultdict(int)
-        for f in shipyard.incoming_allied_fleets:
-            shipyard_reinforcements[len(f.route)] += f.ship_count
-
-        spawn_cost = board.spawn_cost
-        player_kore = player.kore
-        ship_count = shipyard.ship_count
-        future_ship_count = [ship_count]
-        for t in range(1, board.size + 1):
-            ship_count += shipyard_reinforcements[t]
-            player_kore += time_to_fleet_kore[t]
-
-            can_spawn = max_ships_to_spawn(shipyard.turns_controlled + t)
-            spawn_count = min(int(player_kore // spawn_cost), can_spawn)
-            player_kore -= spawn_count * spawn_cost
-            ship_count += spawn_count
-            future_ship_count.append(ship_count)
-
-        return future_ship_count
 
 
 def capture_shipyards(agent: Player, max_attack_distance=10):

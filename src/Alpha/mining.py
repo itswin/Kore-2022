@@ -77,14 +77,17 @@ def mine(agent: Player):
         for route in routes:
             route_points = route.points()
 
-            if all(point_to_score[x] > 0 for x in route_points):
+            worst_score = min(point_to_score[p] for p in route_points)
+            if worst_score <= 0:
                 num_ships_to_launch = free_ships
+                score_penalty = 0
             else:
                 if free_ships < mean_fleet_size:
                     continue
                 num_ships_to_launch = min(free_ships, max_fleet_size)
+                score_penalty = (free_ships + worst_score) * 0.5
 
-            score = route.expected_kore(board, num_ships_to_launch) / len(route)
+            score = route.expected_kore(board, num_ships_to_launch) / len(route) + score_penalty
             route_to_score[route] = score
 
         if not route_to_score:
@@ -99,6 +102,7 @@ def mine(agent: Player):
             if num_ships_to_launch < route.plan.min_fleet_size():
                 continue
             else:
+                logger.debug(f"Mining Route: {route.plan}, {route_to_score[route]}")
                 sy.action = Launch(num_ships_to_launch, route)
                 break
 
@@ -125,7 +129,8 @@ def estimate_board_risk(player: Player):
                 point_to_score[p] = 1
         else:
             for p in points:
-                point_to_score[p] = -1
+                t = p.distance_from(sy.point)
+                point_to_score[p] = -sy.estimate_shipyard_power(t + 1)
 
     return point_to_score
 

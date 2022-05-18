@@ -266,6 +266,7 @@ class Shipyard(PositionObj):
         self._ship_count = ship_count
         self._turns_controlled = turns_controlled
         self._guard_ship_count = 0
+        self._future_ship_count = None
         self.action: Optional[_ShipyardAction] = None
 
     @property
@@ -307,6 +308,44 @@ class Shipyard(PositionObj):
             if f.player_id != self.player_id and f.route.end == self.point:
                 fleets.append(f)
         return fleets
+
+    def estimate_shipyard_power(self, time):
+        if self._future_ship_count is None:
+            self._future_ship_count = self._estimate_future_ship_count()
+        if time < 0:
+            return 0
+        if len(self._future_ship_count) <= time:
+            return self._future_ship_count[-1]
+        return self._future_ship_count[time]
+
+    def _estimate_future_ship_count(self):
+        player = self.player
+        board = self.board
+
+        time_to_fleet_kore = defaultdict(int)
+        for sh in player.shipyards:
+            for f in sh.incoming_allied_fleets:
+                time_to_fleet_kore[len(f.route)] += f.expected_kore()
+
+        shipyard_reinforcements = defaultdict(int)
+        for f in self.incoming_allied_fleets:
+            shipyard_reinforcements[len(f.route)] += f.ship_count
+
+        spawn_cost = board.spawn_cost
+        player_kore = player.kore
+        ship_count = self.ship_count
+        future_ship_count = [ship_count]
+        for t in range(1, board.size + 1):
+            ship_count += shipyard_reinforcements[t]
+            player_kore += time_to_fleet_kore[t]
+ 
+            can_spawn = max_ships_to_spawn(self.turns_controlled + t)
+            spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+            player_kore -= spawn_count * spawn_cost
+            ship_count += spawn_count
+            future_ship_count.append(ship_count)
+
+        return future_ship_count
 
 
 class Fleet(PositionObj):
@@ -637,7 +676,7 @@ class Board:
         for p in self._players:
             if p.game_id == game_id:
                 return p
-        raise KeyError(f"Player `{game_id}` doas not exists.")
+        raise KeyError(f"Player `{game_id}` does not exist.")
 
     def get_obj_at_point(self, point: Point) -> Optional[Union[Fleet, Shipyard]]:
         for x in itertools.chain(self.fleets, self.shipyards):
