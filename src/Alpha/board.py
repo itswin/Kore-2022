@@ -672,6 +672,10 @@ class Board:
     def shipyards(self) -> List[Shipyard]:
         return self._shipyards
 
+    @cached_property
+    def total_kore(self) -> int:
+        return sum(x.kore for x in self)
+
     def get_player(self, game_id) -> Player:
         for p in self._players:
             if p.game_id == game_id:

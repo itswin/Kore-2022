@@ -86,32 +86,44 @@ def find_best_position_for_shipyards(player: Player):
 
     shipyard_to_scores = defaultdict(list)
     for p in board:
-        if p.kore > 50:
+        if p.kore > 100 or p.kore > board.total_kore * 0.01:
             continue
 
-        closed_shipyard = None
-        min_distance = board.size
+        closest_friendly_sy = None
+        closest_enemy_sy = None
+        min_friendly_distance = board.size
+        min_enemy_distance = board.size
         for shipyard in shipyards:
             distance = shipyard.point.distance_from(p)
             if shipyard.player_id != player.game_id:
                 distance -= 1
+                if distance < min_enemy_distance:
+                    closest_enemy_sy = shipyard
+                    min_enemy_distance = distance
+            else:
+                if distance < min_friendly_distance:
+                    closest_friendly_sy = shipyard
+                    min_friendly_distance = distance
 
-            if distance < min_distance:
-                closed_shipyard = shipyard
-                min_distance = distance
+        closest_sy = closest_friendly_sy if min_friendly_distance < min_enemy_distance else closest_enemy_sy
+        min_distance = min(min_friendly_distance, min_enemy_distance)
 
         if (
-            not closed_shipyard
-            or closed_shipyard.player_id != player.game_id
+            not closest_sy
+            or closest_sy.player_id != player.game_id
             or min_distance < 3
             or min_distance > 5
         ):
             continue
 
-        nearby_kore = sum(x.kore for x in p.nearby_points(10))
+        nearby_kore = sum(x.kore / p.distance_from(x) for x in p.nearby_points(10))
         nearby_shipyards = sum(1 for x in board.shipyards if x.distance_from(p) < 5)
-        score = nearby_kore - 1000 * nearby_shipyards - 1000 * min_distance
-        shipyard_to_scores[closed_shipyard].append({"score": score, "point": p})
+        shipyard_penalty = 200 * nearby_shipyards
+        distance_penalty = 100 * min_distance
+        enemy_penalty = 0 if min_enemy_distance > 8 else 150 * (8 - min_enemy_distance)
+
+        score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
+        shipyard_to_scores[closest_sy].append({"score": score, "point": p})
 
     shipyard_to_point = {}
     for shipyard, scores in shipyard_to_scores.items():

@@ -93,7 +93,7 @@ def is_inevitable_victory(player: Player):
     if board.steps_left > 100:
         return False
 
-    board_kore = sum(x.kore for x in board) * (1 + board.regen_rate) ** board.steps_left
+    board_kore = board.total_kore * (1 + board.regen_rate) ** board.steps_left
 
     player_kore = player.kore + player.fleet_expected_kore()
     opponent_kore = max(x.kore + x.fleet_expected_kore() for x in player.opponents)

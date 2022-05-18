@@ -6,7 +6,7 @@ from datetime import datetime
 from kaggle_environments import make
 
 env = make("kore_fleets")
-env.run([Alpha, Miner])
+env.run([Alpha, KoreBeta])
 
 now = datetime.now()
 file_name = now.strftime("games/game_%m-%d_%H:%M:%S.html")

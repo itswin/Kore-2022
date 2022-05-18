@@ -80,14 +80,14 @@ def mine(agent: Player):
             worst_score = min(point_to_score[p] for p in route_points)
             if worst_score <= 0:
                 num_ships_to_launch = free_ships
-                score_penalty = 0
+                score_penalty = 1
             else:
                 if free_ships < mean_fleet_size:
                     continue
                 num_ships_to_launch = min(free_ships, max_fleet_size)
-                score_penalty = (free_ships + worst_score) * 0.5
+                score_penalty = _enemy_overage_penalty(free_ships + worst_score)
 
-            score = route.expected_kore(board, num_ships_to_launch) / len(route) + score_penalty
+            score = route.expected_kore(board, num_ships_to_launch) / len(route) * score_penalty
             route_to_score[route] = score
 
         if not route_to_score:
@@ -186,3 +186,6 @@ def find_shipyard_mining_routes(
             routes.append(BoardRoute(departure, plan))
 
     return routes
+
+def _enemy_overage_penalty(x: int) -> float:
+    return 0.5 + 0.4 / (x + 0.1)
