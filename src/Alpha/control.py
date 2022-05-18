@@ -7,12 +7,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from geometry import PlanRoute
     from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute
-    from helpers import is_invitable_victory, find_shortcut_routes
+    from helpers import is_inevitable_victory, find_shortcut_routes
     from logger import logger
 else:
     from .geometry import PlanRoute
     from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute
-    from .helpers import is_invitable_victory, find_shortcut_routes
+    from .helpers import is_inevitable_victory, find_shortcut_routes
     from .logger import logger
 
 # <--->
@@ -68,12 +68,12 @@ def direct_attack(agent: Player, max_distance: int = 10):
                 if sy.point.distance_from(target_point) != target_time:
                     continue
 
-                paths = sy.point.dirs_to(target_point)
+                paths = sy.point.dirs_to_h(target_point)
                 random.shuffle(paths)
                 plan = PlanRoute(paths)
                 destination = point_to_closest_shipyard[target_point]
 
-                paths = target_point.dirs_to(destination)
+                paths = target_point.dirs_to_h(destination)
                 random.shuffle(paths)
                 plan += PlanRoute(paths)
                 if num_ships_to_launch < plan.min_fleet_size():
@@ -222,7 +222,7 @@ def _need_more_ships(agent: Player, ship_count: int):
         return False
     if ship_count > _max_ships_to_control(agent):
         return False
-    if board.steps_left < 50 and is_invitable_victory(agent):
+    if board.steps_left < 50 and is_inevitable_victory(agent):
         return False
     return True
 

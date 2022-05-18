@@ -10,10 +10,12 @@ if IS_KAGGLE:
     from basic import min_ship_count_for_flight_plan_len
     from geometry import Point, Convert, PlanRoute, PlanPath
     from board import Player, BoardRoute, Launch
+    from logger import logger
 else:
     from .basic import min_ship_count_for_flight_plan_len
     from .geometry import Point, Convert, PlanRoute, PlanPath
     from .board import Player, BoardRoute, Launch
+    from .logger import logger
 
 # <--->
 
@@ -24,6 +26,7 @@ def expand(player: Player):
     if not num_shipyards_to_create:
         return
 
+    logger.debug("---- Building shipyard ----")
     shipyard_positions = {x.point for x in board.shipyards}
 
     shipyard_to_point = find_best_position_for_shipyards(player)
@@ -51,7 +54,7 @@ def expand(player: Player):
             if distance > target_distance:
                 continue
 
-            plan = PlanRoute(shipyard.dirs_to(p) + p.dirs_to(target))
+            plan = PlanRoute(shipyard.dirs_to_h(p) + p.dirs_to_h(target))
             route = BoardRoute(shipyard.point, plan)
 
             if shipyard.available_ship_count < min_ship_count_for_flight_plan_len(
@@ -148,6 +151,7 @@ def need_more_shipyards(player: Player) -> int:
     else:
         scale = 1000
 
+    logger.debug(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
     needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance
     if not needed:
         return 0

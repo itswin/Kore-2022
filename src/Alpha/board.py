@@ -1,6 +1,7 @@
 import itertools
 import numpy as np
 import os
+import time
 from typing import Dict, List, Union, Optional, Generator
 from collections import defaultdict
 from kaggle_environments.envs.kore_fleets.helpers import Configuration
@@ -219,7 +220,7 @@ class BoardRoute:
                 if p in point_to_time and t < point_to_time[p]:
                     point_to_kore[p] *= f.collection_rate
 
-        return sum([kore * rate for kore in point_to_kore.values()])
+        return sum([point_to_kore[p] * rate for p in self])
 
 
 class PositionObj(Obj):
@@ -232,10 +233,10 @@ class PositionObj(Obj):
     def __repr__(self):
         return f"{self.__class__.__name__}(id={self._game_id}, position={self._point}, player={self._player_id})"
 
-    def dirs_to(self, obj: Union["PositionObj", Point]):
+    def dirs_to_h(self, obj: Union["PositionObj", Point]):
         if isinstance(obj, Point):
-            return self._point.dirs_to(obj)
-        return self._point.dirs_to(obj.point)
+            return self._point.dirs_to_h(obj)
+        return self._point.dirs_to_h(obj.point)
 
     def distance_from(self, obj: Union["PositionObj", Point]) -> int:
         if isinstance(obj, Point):
@@ -413,6 +414,7 @@ class Player(Obj):
         super().__init__(*args, **kwargs)
         self._kore = kore
         self._board = board
+        self._start_time = time.time()
 
     @property
     def kore(self):
@@ -503,6 +505,9 @@ class Player(Obj):
     def available_kore(self):
         return self._kore - self.need_kore_for_spawn()
 
+    def time_remaining(self):
+        return self.board.act_timeout - (time.time() - self._start_time)
+
 
 _FIELD = None
 
@@ -511,8 +516,6 @@ class Board:
     def __init__(self, obs, conf):
         self._conf = Configuration(conf)
         self._step = obs["step"]
-        print("Alpha board", self._step)
-        logger.info(f"Alpha board{self._step}>")
 
         global _FIELD
         if _FIELD is None or self._step == 0:
@@ -613,6 +616,10 @@ class Board:
     @property
     def max_cell_kore(self):
         return self._conf.max_cell_kore
+
+    @property
+    def act_timeout(self):
+        return self._conf.act_timeout
 
     @property
     def players(self) -> List[Player]:

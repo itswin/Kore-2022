@@ -8,7 +8,7 @@ if IS_KAGGLE:
     from logger import logger, init_logger
     from offence import capture_shipyards
     from defence import defend_shipyards
-    from expantion import expand
+    from expansion import expand
     from mining import mine
     from control import spawn, greedy_spawn, adjacent_attack, direct_attack
 else:
@@ -16,7 +16,7 @@ else:
     from .logger import logger, init_logger
     from .offence import capture_shipyards
     from .defence import defend_shipyards
-    from .expantion import expand
+    from .expansion import expand
     from .mining import mine
     from .control import spawn, greedy_spawn, adjacent_attack, direct_attack
 # <--->

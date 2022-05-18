@@ -60,8 +60,8 @@ def find_shortcut_routes(
         if distance != route_distance:
             continue
 
-        path1 = start.dirs_to(p)
-        path2 = p.dirs_to(end)
+        path1 = start.dirs_to_h(p)
+        path2 = p.dirs_to_h(end)
         random.shuffle(path1)
         random.shuffle(path2)
 
@@ -85,7 +85,7 @@ def find_shortcut_routes(
     return routes
 
 
-def is_invitable_victory(player: Player):
+def is_inevitable_victory(player: Player):
     if not player.opponents:
         return True
 

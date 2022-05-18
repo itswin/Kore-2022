@@ -11,10 +11,12 @@ if IS_KAGGLE:
     from geometry import PlanRoute
     from board import Player, BoardRoute, Launch, Shipyard
     from helpers import is_intercept_route
+    from logger import logger
 else:
     from .geometry import PlanRoute
     from .board import Player, BoardRoute, Launch, Shipyard
     from .helpers import is_intercept_route
+    from .logger import logger
 
 # <--->
 
@@ -149,21 +151,29 @@ def find_shipyard_mining_routes(
             continue
 
         paths = departure.dirs_to(c)
-        random.shuffle(paths)
-        plan = PlanRoute(paths)
+        plans1 = [PlanRoute(path) for path in paths]
         destination = sorted(destinations, key=lambda x: c.distance_from(x))[0]
+        plans2 = []
         if destination == departure:
-            plan += plan.reverse()
+            # @time_save 25%
+            # Don't consider rectangle paths in both directions
+            # The only difference is intercept timings.
+            plans2 = [plan.reverse() for plan in plans1]
         else:
-            paths = c.dirs_to(destination)
-            random.shuffle(paths)
-            plan += PlanRoute(paths)
+            paths2 = c.dirs_to(destination)
+            plans2 = [PlanRoute(path) for path in paths2]
 
-        route = BoardRoute(departure, plan)
+        plans = []
+        for plan1 in plans1:
+            for plan2 in plans2:
+                plans.append(plan1 + plan2)
 
-        if is_intercept_route(route, player, safety):
-            continue
+        for plan in plans:
+            route = BoardRoute(departure, plan)
 
-        routes.append(BoardRoute(departure, plan))
+            if is_intercept_route(route, player, safety):
+                continue
+
+            routes.append(BoardRoute(departure, plan))
 
     return routes

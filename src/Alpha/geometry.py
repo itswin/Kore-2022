@@ -122,7 +122,7 @@ class Point(Obj):
 
     @cached_call
     def distance_from(self, point: "Point") -> int:
-        return sum(p.num_steps for p in self.dirs_to(point))
+        return sum(p.num_steps for p in self.dirs_to_h(point))
 
     @cached_property
     def adjacent_points(self) -> List["Point"]:
@@ -151,7 +151,7 @@ class Point(Obj):
         raise ValueError("Radius must be more or equal then 1")
 
     @cached_call
-    def dirs_to(self, point: "Point") -> List["PlanPath"]:
+    def dirs_to_h(self, point: "Point") -> List["PlanPath"]:
         dx, dy = self._field.swap(self._x - point.x, self._y - point.y)
         ret = []
         if dx:
@@ -160,6 +160,13 @@ class Point(Obj):
             ret.append(PlanPath(South, dy))
         return ret
 
+    @cached_call
+    def dirs_to_v(self, point: "Point") -> List["PlanPath"]:
+        return self.dirs_to_h(point)[::-1]
+    
+    @cached_call
+    def dirs_to(self, point: "Point") -> List[List["PlanPath"]]:
+        return [self.dirs_to_h(point), self.dirs_to_v(point)]
 
 class Field:
     def __init__(self, size: int):
@@ -308,6 +315,9 @@ class PlanRoute:
 
     def reverse(self) -> "PlanRoute":
         return PlanRoute([x.reverse() for x in self.paths])
+
+    def reverse2(self) -> "PlanRoute":
+        return PlanRoute([x.reverse() for x in self.paths[::-1]])
 
     @property
     def actions(self):
