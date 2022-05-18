@@ -12,9 +12,8 @@ class _FileHandler(logging.FileHandler):
         if not LOGGING_ENABLED:
             return
 
-        if IS_KAGGLE:
-            print(self.format(record))
-        else:
+        print(self.format(record))
+        if not IS_KAGGLE:
             super().emit(record)
 
 
