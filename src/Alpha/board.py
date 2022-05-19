@@ -223,6 +223,22 @@ class BoardRoute:
         return sum([point_to_kore[p] * rate for p in self])
 
 
+class MiningRoute(BoardRoute):
+    def __init__(self, start: "Point", plan: "PlanRoute", wait_time: int):
+        super().__init__(start, plan)
+        self._time_to_mine = wait_time
+
+    @property
+    def time_to_mine(self):
+        return self._time_to_mine
+
+    def can_execute(self):
+        return self._time_to_mine == 0
+
+    def __len__(self):
+        return super().__len__() + self.time_to_mine
+
+
 class PositionObj(Obj):
     def __init__(self, *args, point: Point, player_id: int, board: "Board", **kwargs):
         super().__init__(*args, **kwargs)
@@ -346,6 +362,12 @@ class Shipyard(PositionObj):
             future_ship_count.append(ship_count)
 
         return future_ship_count
+
+    def calc_time_for_ships(self, num_ships: int) -> int:
+        for t in range(self.board.size + 1):
+            if self.estimate_shipyard_power(t) >= num_ships:
+                return t
+        return np.inf
 
 
 class Fleet(PositionObj):

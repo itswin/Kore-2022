@@ -9,12 +9,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute
-    from board import Player, BoardRoute, Launch, Shipyard
+    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute
     from helpers import is_intercept_route
     from logger import logger
 else:
     from .geometry import PlanRoute
-    from .board import Player, BoardRoute, Launch, Shipyard
+    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute
     from .helpers import is_intercept_route
     from .logger import logger
 
@@ -94,18 +94,16 @@ def mine(agent: Player):
         if not route_to_score:
             continue
 
-        routes = sorted(route_to_score, key=lambda x: -route_to_score[x])
-        for route in routes:
-            if all(point_to_score[x] >= 1 for x in route):
-                num_ships_to_launch = free_ships
-            else:
-                num_ships_to_launch = min(free_ships, 199)
-            if num_ships_to_launch < route.plan.min_fleet_size():
-                continue
-            else:
-                logger.debug(f"Mining Route: {route.plan}, {route_to_score[route]}")
-                sy.action = Launch(num_ships_to_launch, route)
-                break
+        best_route = max(route_to_score, key=lambda x: route_to_score[x])
+        if all(point_to_score[x] >= 1 for x in best_route):
+            num_ships_to_launch = free_ships
+        else:
+            num_ships_to_launch = min(free_ships, 199)
+        if best_route.can_execute():
+            logger.debug(f"Mining Route: {best_route.plan}, {route_to_score[best_route]}")
+            sy.action = Launch(num_ships_to_launch, best_route)
+        else:
+            logger.debug(f"Waiting for route: {best_route.plan}, {route_to_score[best_route]}")
 
 
 def estimate_board_risk(player: Player):
@@ -179,11 +177,12 @@ def find_shipyard_mining_routes(
                 plans.append(plan1 + plan2)
 
         for plan in plans:
-            route = BoardRoute(departure, plan)
+            wait_time = sy.calc_time_for_ships(plan.min_fleet_size())
+            route = MiningRoute(departure, plan, wait_time)
 
             if is_intercept_route(route, player, safety):
                 continue
 
-            routes.append(BoardRoute(departure, plan))
+            routes.append(MiningRoute(departure, plan, wait_time))
 
     return routes
