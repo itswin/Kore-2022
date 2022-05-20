@@ -4,7 +4,7 @@ import logging
 FILE = "null.log"
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 LEVEL = logging.DEBUG if not IS_KAGGLE else logging.INFO
-LOGGING_ENABLED = True
+LOGGING_ENABLED = False
 
 
 class _FileHandler(logging.FileHandler):
@@ -36,4 +36,4 @@ def init_logger(_logger):
     _logger.addHandler(ch)
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(os.getcwd())

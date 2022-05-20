@@ -38,4 +38,4 @@ def init_logger(_logger):
     _logger.addHandler(ch)
 
 
-logger = logging.getLogger()
+logger = logging.getLogger(os.getcwd())
