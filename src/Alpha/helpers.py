@@ -1,16 +1,16 @@
 import os
 import random
-from typing import List
+from typing import List, Tuple
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
     from geometry import Point
-    from board import Board, Player, BoardRoute, PlanRoute
+    from board import Board, Player, BoardRoute, PlanRoute, Shipyard
 else:
     from .geometry import Point
-    from .board import Board, Player, BoardRoute, PlanRoute
+    from .board import Board, Player, BoardRoute, PlanRoute, Shipyard
 
 # <--->
 
@@ -98,3 +98,24 @@ def is_inevitable_victory(player: Player):
     player_kore = player.kore + player.fleet_expected_kore()
     opponent_kore = max(x.kore + x.fleet_expected_kore() for x in player.opponents)
     return player_kore > opponent_kore + board_kore
+
+
+def find_closest_shipyards(player: Player, p: Point) -> Tuple[Shipyard, Shipyard, int, int]:
+    board = player.board
+    closest_friendly_sy = None
+    closest_enemy_sy = None
+    min_friendly_distance = board.size
+    min_enemy_distance = board.size
+
+    for shipyard in board.shipyards:
+        distance = shipyard.point.distance_from(p)
+        if shipyard.player_id != player.game_id:
+            if distance < min_enemy_distance:
+                closest_enemy_sy = shipyard
+                min_enemy_distance = distance
+        else:
+            if distance < min_friendly_distance:
+                closest_friendly_sy = shipyard
+                min_friendly_distance = distance
+
+    return closest_friendly_sy, closest_enemy_sy, min_friendly_distance, min_enemy_distance

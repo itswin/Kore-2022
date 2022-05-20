@@ -10,12 +10,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from geometry import PlanRoute
     from board import Player, BoardRoute, Launch, Shipyard, MiningRoute
-    from helpers import is_intercept_route
+    from helpers import is_intercept_route, find_closest_shipyards
     from logger import logger
 else:
     from .geometry import PlanRoute
     from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute
-    from .helpers import is_intercept_route
+    from .helpers import is_intercept_route, find_closest_shipyards
     from .logger import logger
 
 # <--->
@@ -78,7 +78,7 @@ def mine(agent: Player):
             route_points = route.points()
 
             worst_score = min(point_to_score[p] for p in route_points)
-            if worst_score <= 0:
+            if worst_score > 0:
                 num_ships_to_launch = free_ships
                 score_penalty = 1
             else:
@@ -86,7 +86,7 @@ def mine(agent: Player):
                     continue
                 num_ships_to_launch = min(free_ships, max_fleet_size)
                 opp_adv = -(free_ships + worst_score)
-                score_penalty = 0 if opp_adv > 0 else 1
+                score_penalty = 0 if opp_adv >= 0 else 1
 
             score = route.expected_kore(board, num_ships_to_launch) / len(route) * score_penalty
             route_to_score[route] = score
@@ -100,36 +100,26 @@ def mine(agent: Player):
         else:
             num_ships_to_launch = min(free_ships, 199)
         if best_route.can_execute():
-            logger.debug(f"Mining Route: {best_route.plan}, {route_to_score[best_route]}")
+            logger.info(f"Mining Route: {best_route.plan}, {route_to_score[best_route]}")
             sy.action = Launch(num_ships_to_launch, best_route)
         else:
-            logger.debug(f"Waiting for route: {best_route.plan}, {route_to_score[best_route]}")
+            logger.info(f"Waiting for route: {best_route.plan}, {route_to_score[best_route]}")
 
 
 def estimate_board_risk(player: Player):
     board = player.board
 
-    shipyard_to_area = defaultdict(list)
-    for p in board:
-        closest_shipyard = None
-        min_distance = board.size
-        for sh in board.shipyards:
-            distance = sh.point.distance_from(p)
-            if distance < min_distance:
-                closest_shipyard = sh
-                min_distance = distance
-
-        shipyard_to_area[closest_shipyard].append(p)
-
     point_to_score = {}
-    for sy, points in shipyard_to_area.items():
-        if sy.player_id == player.game_id:
-            for p in points:
-                point_to_score[p] = 1
+    for p in board:
+        (closest_friendly_sy,
+         closest_enemy_sy,
+         min_friendly_distance,
+         min_enemy_distance) = find_closest_shipyards(player, p)
+        if min_friendly_distance < min_enemy_distance:
+            point_to_score[p] = 1
         else:
-            for p in points:
-                t = p.distance_from(sy.point)
-                point_to_score[p] = -sy.estimate_shipyard_power(t + 1)
+            dt = min_enemy_distance - min_friendly_distance
+            point_to_score[p] = -closest_enemy_sy.estimate_shipyard_power(dt)
 
     return point_to_score
 

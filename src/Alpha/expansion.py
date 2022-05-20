@@ -11,11 +11,13 @@ if IS_KAGGLE:
     from geometry import Point, Convert, PlanRoute, PlanPath
     from board import Player, BoardRoute, Launch
     from logger import logger
+    from helpers import find_closest_shipyards
 else:
     from .basic import min_ship_count_for_flight_plan_len
     from .geometry import Point, Convert, PlanRoute, PlanPath
     from .board import Player, BoardRoute, Launch
     from .logger import logger
+    from .helpers import find_closest_shipyards
 
 # <--->
 
@@ -89,21 +91,10 @@ def find_best_position_for_shipyards(player: Player):
         if p.kore > 100 or p.kore > board.total_kore * 0.01:
             continue
 
-        closest_friendly_sy = None
-        closest_enemy_sy = None
-        min_friendly_distance = board.size
-        min_enemy_distance = board.size
-        for shipyard in shipyards:
-            distance = shipyard.point.distance_from(p)
-            if shipyard.player_id != player.game_id:
-                distance -= 1
-                if distance < min_enemy_distance:
-                    closest_enemy_sy = shipyard
-                    min_enemy_distance = distance
-            else:
-                if distance < min_friendly_distance:
-                    closest_friendly_sy = shipyard
-                    min_friendly_distance = distance
+        (closest_friendly_sy,
+         closest_enemy_sy,
+         min_friendly_distance,
+         min_enemy_distance) = find_closest_shipyards(player, p)
 
         closest_sy = closest_friendly_sy if min_friendly_distance < min_enemy_distance else closest_enemy_sy
         min_distance = min(min_friendly_distance, min_enemy_distance)

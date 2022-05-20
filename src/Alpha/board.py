@@ -367,7 +367,7 @@ class Shipyard(PositionObj):
         for t in range(self.board.size + 1):
             if self.estimate_shipyard_power(t) >= num_ships:
                 return t
-        return np.inf
+        return 10000
 
 
 class Fleet(PositionObj):
