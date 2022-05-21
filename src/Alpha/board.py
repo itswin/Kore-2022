@@ -332,7 +332,7 @@ class Shipyard(PositionObj):
             return 0
         if len(self._future_ship_count) <= time:
             return self._future_ship_count[-1]
-        return self._future_ship_count[time]
+        return self._future_ship_count[time] - self._guard_ship_count
 
     def _estimate_future_ship_count(self):
         player = self.player

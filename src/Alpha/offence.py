@@ -31,7 +31,16 @@ class _ShipyardTarget:
         return f"Target {self.shipyard}"
 
     def estimate_shipyard_power(self, time):
-        return self.shipyard.estimate_shipyard_power(time)
+        help_power = 0
+        player_id = self.shipyard.player_id
+        for sy in self.shipyard.board.shipyards:
+            if sy.player_id != player_id or sy == self.shipyard:
+                continue
+            help_time = self.point.distance_from(sy.point)
+            help_power += sy.estimate_shipyard_power(time - help_time - 1)
+
+        own_power = self.shipyard.estimate_shipyard_power(time)
+        return own_power + help_power
 
     def _get_total_incoming_power(self):
         return sum(x.ship_count for x in self.shipyard.incoming_allied_fleets)
