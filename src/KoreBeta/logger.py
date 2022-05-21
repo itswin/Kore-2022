@@ -36,4 +36,7 @@ def init_logger(_logger):
     _logger.addHandler(ch)
 
 
-logger = logging.getLogger("KoreBeta")
+if IS_KAGGLE:
+    logger = logging.getLogger()
+else:
+    logger = logging.getLogger("KoreBeta")

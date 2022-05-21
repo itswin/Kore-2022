@@ -1,0 +1,2 @@
+Check offence decision making.
+Don't send ships if they can reinforce. Just gives them Kore
