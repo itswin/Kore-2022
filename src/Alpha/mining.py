@@ -149,23 +149,8 @@ def find_shipyard_mining_routes(
         if c == departure or c in destinations:
             continue
 
-        paths = departure.dirs_to(c)
-        plans1 = [PlanRoute(path) for path in paths]
-        destination = sorted(destinations, key=lambda x: c.distance_from(x))[0]
-        plans2 = []
-        if destination == departure:
-            # @time_save 25%
-            # Don't consider rectangle paths in both directions
-            # The only difference is intercept timings.
-            plans2 = [plan.reverse() for plan in plans1]
-        else:
-            paths2 = c.dirs_to(destination)
-            plans2 = [PlanRoute(path) for path in paths2]
-
-        plans = []
-        for plan1 in plans1:
-            for plan2 in plans2:
-                plans.append(plan1 + plan2)
+        destination = min(destinations, key=lambda x: c.distance_from(x))
+        plans = departure.get_plans_through([c, destination])
 
         for plan in plans:
             wait_time = sy.calc_time_for_ships(plan.min_fleet_size())

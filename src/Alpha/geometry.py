@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import os
 from typing import Tuple, List, Generator
@@ -7,8 +8,10 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from basic import Obj, cached_call, cached_property, min_ship_count_for_flight_plan_len
+    from logger import logger
 else:
     from .basic import Obj, cached_call, cached_property, min_ship_count_for_flight_plan_len
+    from .logger import logger
 
 # <--->
 
@@ -167,6 +170,23 @@ class Point(Obj):
     @cached_call
     def dirs_to(self, point: "Point") -> List[List["PlanPath"]]:
         return [self.dirs_to_h(point), self.dirs_to_v(point)]
+    
+    def get_plans_through(self, points: List["Point"]) -> List["PlanRoute"]:
+        last = self
+        mid_plans = []
+        for p in points:
+            paths = last.dirs_to(p)
+            mid_plans.append([PlanRoute(path) for path in paths])
+            last = p
+    
+        plans = []
+        for plan in itertools.product(*mid_plans):
+            curr_plan = PlanRoute([])
+            for path in plan:
+                curr_plan += path
+            plans.append(curr_plan)
+        return plans
+
 
 class Field:
     def __init__(self, size: int):

@@ -60,27 +60,23 @@ def find_shortcut_routes(
         if distance != route_distance:
             continue
 
-        path1 = start.dirs_to_h(p)
-        path2 = p.dirs_to_h(end)
-        random.shuffle(path1)
-        random.shuffle(path2)
+        plans = start.get_plans_through([p, end])
 
-        plan = PlanRoute(path1 + path2)
+        for plan in plans:
+            if num_ships < plan.min_fleet_size():
+                continue
 
-        if num_ships < plan.min_fleet_size():
-            continue
+            route = BoardRoute(start, plan)
 
-        route = BoardRoute(start, plan)
+            if is_intercept_route(
+                route,
+                player,
+                safety=safety,
+                allow_shipyard_intercept=allow_shipyard_intercept,
+            ):
+                continue
 
-        if is_intercept_route(
-            route,
-            player,
-            safety=safety,
-            allow_shipyard_intercept=allow_shipyard_intercept,
-        ):
-            continue
-
-        routes.append(route)
+            routes.append(route)
 
     return routes
 

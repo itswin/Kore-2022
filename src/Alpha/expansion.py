@@ -154,7 +154,7 @@ def need_more_shipyards(player: Player) -> int:
     else:
         scale = 1000
 
-    logger.debug(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
+    logger.info(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
     needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance
     if not needed:
         return 0
