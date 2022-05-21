@@ -38,7 +38,4 @@ def init_logger(_logger):
     _logger.addHandler(ch)
 
 
-if IS_KAGGLE:
-    logger = logging.getLogger()
-else:
-    logger = logging.getLogger(os.path.basename(os.path.normpath(os.getcwd())))
+logger = logging.getLogger("Alpha")
