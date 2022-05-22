@@ -109,9 +109,9 @@ def capture_shipyards(agent: Player, max_attack_distance=10):
                 num_ships_to_launch,
             )
             if routes:
-                route = random.choice(routes)
+                best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch) / len(route))
                 logger.info(
                     f"Attack shipyard {sy.point}->{t.point}"
                 )
-                sy.action = Launch(num_ships_to_launch, route)
+                sy.action = Launch(num_ships_to_launch, best_route)
                 break
