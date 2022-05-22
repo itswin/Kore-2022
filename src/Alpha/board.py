@@ -226,12 +226,12 @@ class BoardRoute:
         for f in board.fleets:
             for t, p in enumerate(f.route):
                 if p in point_to_time and t < point_to_time[p]:
-                    point_to_kore[p] *= f.collection_rate
+                    point_to_kore[p] *= (1 - f.collection_rate)
 
         res = 0
-        for p in point_to_kore:
+        for p in self:
             res += point_to_kore[p]
-            point_to_kore[p] *= rate
+            point_to_kore[p] *= (1 - rate)
         return res
 
 
