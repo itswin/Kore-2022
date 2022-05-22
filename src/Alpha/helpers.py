@@ -100,8 +100,8 @@ def find_closest_shipyards(player: Player, p: Point) -> Tuple[Shipyard, Shipyard
     board = player.board
     closest_friendly_sy = None
     closest_enemy_sy = None
-    min_friendly_distance = board.size
-    min_enemy_distance = board.size
+    min_friendly_distance = 100000
+    min_enemy_distance = 100000
 
     for shipyard in board.shipyards:
         distance = shipyard.point.distance_from(p)
