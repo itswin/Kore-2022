@@ -89,6 +89,14 @@ class DoNothing(_ShipyardAction):
         raise NotImplementedError
 
 
+class DontLaunch(DoNothing):
+    def __repr__(self):
+        return "Don't launch"
+
+    def to_str(self):
+        raise NotImplementedError
+
+
 class BoardPath:
     max_length = 32
 
@@ -220,7 +228,11 @@ class BoardRoute:
                 if p in point_to_time and t < point_to_time[p]:
                     point_to_kore[p] *= f.collection_rate
 
-        return sum([point_to_kore[p] * rate for p in self])
+        res = 0
+        for p in point_to_kore:
+            res += point_to_kore[p]
+            point_to_kore[p] *= rate
+        return res
 
 
 class MiningRoute(BoardRoute):

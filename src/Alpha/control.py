@@ -6,19 +6,19 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute
-    from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute
-    from helpers import is_inevitable_victory, find_shortcut_routes
+    from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch
+    from helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
     from logger import logger
 else:
     from .geometry import PlanRoute
-    from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute
-    from .helpers import is_inevitable_victory, find_shortcut_routes
+    from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch
+    from .helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
     from .logger import logger
 
 # <--->
 
 
-def direct_attack(agent: Player, max_distance: int = 10):
+def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int = 5):
     board = agent.board
 
     max_distance = min(board.steps_left, max_distance)
@@ -33,6 +33,8 @@ def direct_attack(agent: Player, max_distance: int = 10):
     if not targets:
         return
 
+    targets.sort(key=lambda x: x.expected_value(), reverse=True)
+
     shipyards = [
         x for x in agent.shipyards if x.available_ship_count > 0 and not x.action
     ]
@@ -41,22 +43,20 @@ def direct_attack(agent: Player, max_distance: int = 10):
 
     point_to_closest_shipyard = {}
     for p in board:
-        closest_shipyard = None
-        min_distance = board.size
-        for sy in agent.shipyards:
-            distance = sy.point.distance_from(p)
-            if distance < min_distance:
-                min_distance = distance
-                closest_shipyard = sy
-        point_to_closest_shipyard[p] = closest_shipyard.point
+        (closest_friendly_sy, _, _, _) = find_closest_shipyards(agent, p)
+        point_to_closest_shipyard[p] = closest_friendly_sy.point
 
     opponent_shipyard_points = {x.point for x in board.shipyards if x.player_id != agent.game_id}
     for t in targets:
-        min_ships_to_send = int(t.ship_count * 1.2)
+        min_ships_to_send = int(t.ship_count + 1)
         attacked = False
+        best_candidate_sy = None
+        best_candidate_time = max_time_to_wait
+        best_target_point = None
 
+        shipyards.sort(key=lambda x: x.distance_from(t.point))
         for sy in shipyards:
-            if sy.action or sy.available_ship_count < min_ships_to_send:
+            if sy.action or sy.estimate_shipyard_power(max_time_to_wait) < min_ships_to_send:
                 continue
 
             num_ships_to_launch = sy.available_ship_count
@@ -65,37 +65,49 @@ def direct_attack(agent: Player, max_distance: int = 10):
                 if target_time > max_distance:
                     continue
 
-                if sy.point.distance_from(target_point) != target_time:
+                time_diff = target_time - sy.point.distance_from(target_point)
+                if time_diff != 0:
+                    if time_diff > 0 and time_diff < max_time_to_wait and \
+                        time_diff < best_candidate_time and \
+                        sy.estimate_shipyard_power(time_diff) >= min_ships_to_send:
+                        best_candidate_sy = sy
+                        best_candidate_time = time_diff
+                        best_target_point = target_point
                     continue
 
-                paths = sy.point.dirs_to_h(target_point)
-                random.shuffle(paths)
-                plan = PlanRoute(paths)
+                if num_ships_to_launch < min_ships_to_send:
+                    continue
+
                 destination = point_to_closest_shipyard[target_point]
+                plans = sy.point.get_plans_through([target_point, destination])
+                routes = [BoardRoute(sy.point, plan) for plan in plans]
+                routes.sort(key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                for route in routes:
+                    if num_ships_to_launch < route.plan.min_fleet_size():
+                        continue
 
-                paths = target_point.dirs_to_h(destination)
-                random.shuffle(paths)
-                plan += PlanRoute(paths)
-                if num_ships_to_launch < plan.min_fleet_size():
-                    continue
+                    if any(x in opponent_shipyard_points for x in route.points()):
+                        continue
 
-                route = BoardRoute(sy.point, plan)
+                    if is_intercept_direct_attack_route(route, agent, direct_attack_fleet=t):
+                        continue
 
-                if any(x in opponent_shipyard_points for x in route.points()):
-                    continue
+                    logger.info(
+                        f"Direct attack {sy.point}->{target_point}, distance={target_time}"
+                    )
+                    sy.action = Launch(num_ships_to_launch, route)
+                    attacked = True
+                    break
 
-                if is_intercept_direct_attack_route(route, agent, direct_attack_fleet=t):
-                    continue
-
-                logger.info(
-                    f"Direct attack {sy.point}->{target_point}, distance={target_time}"
-                )
-                sy.action = Launch(num_ships_to_launch, route)
-                attacked = True
-                break
+                if attacked:
+                    break
 
             if attacked:
                 break
+
+        if not attacked and best_candidate_sy is not None:
+            best_candidate_sy.action = DontLaunch()
+            logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, distance={best_candidate_time}")
 
 
 def is_intercept_direct_attack_route(
@@ -242,7 +254,7 @@ def greedy_spawn(agent: Player):
     ship_count = agent.ship_count
     max_ship_count = _max_ships_to_control(agent)
     for shipyard in agent.shipyards:
-        if shipyard.action:
+        if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
 
         if shipyard.ship_count > agent.ship_count * 0.2 / len(agent.shipyards):
@@ -266,7 +278,7 @@ def spawn(agent: Player):
     ship_count = agent.ship_count
     max_ship_count = _max_ships_to_control(agent)
     for shipyard in agent.shipyards:
-        if shipyard.action:
+        if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
         num_ships_to_spawn = min(
             int(agent.available_kore() // board.spawn_cost),

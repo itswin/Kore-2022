@@ -28,7 +28,7 @@ def expand(player: Player):
     if not num_shipyards_to_create:
         return
 
-    logger.debug("---- Building shipyard ----")
+    logger.info("---- Building shipyard ----")
     shipyard_positions = {x.point for x in board.shipyards}
 
     shipyard_to_point = find_best_position_for_shipyards(player)
