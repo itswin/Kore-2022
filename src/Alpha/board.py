@@ -361,6 +361,18 @@ class Shipyard(PositionObj):
             ship_count += spawn_count
             future_ship_count.append(ship_count)
 
+        t = board.size + 1
+        can_spawn = max_ships_to_spawn(self.turns_controlled + t)
+        spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+        while spawn_count > 0 and t < 2 * board.size:
+            player_kore -= spawn_count * spawn_cost
+            ship_count += spawn_count
+            future_ship_count.append(ship_count)
+
+            t += 1
+            can_spawn = max_ships_to_spawn(self.turns_controlled + t)
+            spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+
         return future_ship_count
 
     def calc_time_for_ships(self, num_ships: int) -> int:
