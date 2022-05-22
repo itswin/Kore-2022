@@ -224,6 +224,8 @@ def _need_more_ships(agent: Player, ship_count: int):
         return False
     if board.steps_left < 50 and is_inevitable_victory(agent):
         return False
+    if board.steps_left < 100 and agent.ship_count > 1.5 * sum(x.ship_count for x in agent.opponents):
+        return False
     return True
 
 
@@ -275,3 +277,11 @@ def spawn(agent: Player):
             ship_count += num_ships_to_spawn
             if ship_count > max_ship_count:
                 return
+
+
+def save_kore(agent: Player):
+    board = agent.board
+    
+    if board.steps_left < 25:
+        agent.set_kore_reserve(min(agent.kore, 1.25 * sum(x.kore for x in agent.opponents)))
+        logger.info(f"Saved kore: {agent.kore_reserve}")

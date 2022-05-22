@@ -10,7 +10,7 @@ if IS_KAGGLE:
     from defence import defend_shipyards
     from expansion import expand
     from mining import mine
-    from control import spawn, greedy_spawn, adjacent_attack, direct_attack
+    from control import spawn, greedy_spawn, adjacent_attack, direct_attack, save_kore
 else:
     from .board import Board
     from .logger import logger, init_logger
@@ -18,7 +18,7 @@ else:
     from .defence import defend_shipyards
     from .expansion import expand
     from .mining import mine
-    from .control import spawn, greedy_spawn, adjacent_attack, direct_attack
+    from .control import spawn, greedy_spawn, adjacent_attack, direct_attack, save_kore
 # <--->
 
 
@@ -41,6 +41,7 @@ def agent(obs, conf):
         return {}
 
     defend_shipyards(a)
+    save_kore(a)
     capture_shipyards(a)
     adjacent_attack(a)
     direct_attack(a)

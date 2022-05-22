@@ -486,12 +486,21 @@ class Player(Obj):
     def __init__(self, *args, kore: float, board: "Board", **kwargs):
         super().__init__(*args, **kwargs)
         self._kore = kore
+        self._kore_reserve = 0
         self._board = board
         self._start_time = time.time()
 
     @property
     def kore(self):
         return self._kore
+
+    @property
+    def kore_reserve(self):
+        return self._kore_reserve
+
+    def set_kore_reserve(self, kore_reserve):
+        assert kore_reserve <= self._kore
+        self._kore_reserve = kore_reserve
 
     def fleet_kore(self):
         return sum(x.kore for x in self.fleets)
@@ -576,7 +585,7 @@ class Player(Obj):
         return self.board.spawn_cost * self.spawn_ship_count()
 
     def available_kore(self):
-        return self._kore - self.need_kore_for_spawn()
+        return self._kore - self.need_kore_for_spawn() - self.kore_reserve
 
     def time_remaining(self):
         return self.board.act_timeout - (time.time() - self._start_time)
