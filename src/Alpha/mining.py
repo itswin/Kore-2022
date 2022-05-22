@@ -29,7 +29,7 @@ def mine(agent: Player):
     safety = False
     my_ship_count = agent.ship_count
 
-    if my_ship_count < 21:
+    if my_ship_count < 21 and agent.kore > board.spawn_cost:
         return
 
     op_ship_count = max(x.ship_count for x in agent.opponents)
