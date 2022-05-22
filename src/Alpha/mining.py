@@ -1,19 +1,19 @@
 import random
 import numpy as np
 import os
-from typing import List, Dict
+from typing import List
 from collections import defaultdict
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from geometry import PlanRoute, Point
+    from geometry import PlanRoute
     from board import Player, BoardRoute, Launch, Shipyard, MiningRoute
     from helpers import is_intercept_route, find_closest_shipyards
     from logger import logger
 else:
-    from .geometry import PlanRoute, Point
+    from .geometry import PlanRoute
     from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute
     from .helpers import is_intercept_route, find_closest_shipyards
     from .logger import logger
@@ -48,7 +48,7 @@ def mine(agent: Player):
         mean_fleet_size = np.percentile(op_ship_count, 75)
         max_fleet_size = int(max(op_ship_count) * 1.1)
 
-    point_to_time_to_score = estimate_board_risk(agent)
+    point_to_score = estimate_board_risk(agent)
 
     shipyard_count = len(agent.shipyards)
     if shipyard_count < 10:
@@ -77,7 +77,7 @@ def mine(agent: Player):
         for route in routes:
             route_points = route.points()
 
-            worst_score = min(point_to_time_to_score[p][t] for t, p in enumerate(route_points))
+            worst_score = min(point_to_score[p] for p in route_points)
             if worst_score > 0:
                 num_ships_to_launch = free_ships
                 score_penalty = 1
@@ -89,14 +89,13 @@ def mine(agent: Player):
                 score_penalty = 0 if opp_adv >= 0 else 1
 
             score = route.expected_kore(board, num_ships_to_launch) / len(route) * score_penalty
-            route_to_score[route] = (score, worst_score)
+            route_to_score[route] = score
 
         if not route_to_score:
             continue
 
-        best_route = max(route_to_score, key=lambda x: route_to_score[x][0])
-        worst_score = route_to_score[best_route][1]
-        if worst_score > 0:
+        best_route = max(route_to_score, key=lambda x: route_to_score[x])
+        if all(point_to_score[x] >= 1 for x in best_route):
             num_ships_to_launch = free_ships
         else:
             num_ships_to_launch = min(free_ships, 199)
@@ -108,24 +107,22 @@ def mine(agent: Player):
 
 
 # Note: Does not take into account getting a ship next to yours for damage
-def estimate_board_risk(player: Player) -> Dict[Point, Dict[int, int]]:
+def estimate_board_risk(player: Player):
     board = player.board
 
-    point_to_time_to_score = defaultdict(dict)
+    point_to_score = {}
     for p in board:
         (closest_friendly_sy,
          closest_enemy_sy,
          min_friendly_distance,
          min_enemy_distance) = find_closest_shipyards(player, p)
+        if min_friendly_distance < min_enemy_distance:
+            point_to_score[p] = 1
+        else:
+            dt = min_friendly_distance - min_enemy_distance
+            point_to_score[p] = -closest_enemy_sy.estimate_shipyard_power(dt)
 
-        for t in range(0, 2 * board.size):
-            if min_friendly_distance + t < min_enemy_distance:
-                point_to_time_to_score[p][t] = 1
-            else:
-                dt = min_friendly_distance + t - min_enemy_distance
-                point_to_time_to_score[p][t] = -closest_enemy_sy.estimate_shipyard_power(dt)
-
-    return point_to_time_to_score
+    return point_to_score
 
 
 def find_shipyard_mining_routes(
