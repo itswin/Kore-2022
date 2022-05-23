@@ -266,6 +266,13 @@ class PositionObj(Obj):
             return self._point.dirs_to_h(obj)
         return self._point.dirs_to_h(obj.point)
 
+    def get_plans_through(self, obj: List[Union["PositionObj", Point]]):
+        if len(obj) == 0:
+            return []
+        if isinstance(obj[0], Point):
+            return self._point.get_plans_through(obj)
+        return self._point.get_plans_through([o.point for o in obj])
+
     def distance_from(self, obj: Union["PositionObj", Point]) -> int:
         if isinstance(obj, Point):
             return self._point.distance_from(obj)

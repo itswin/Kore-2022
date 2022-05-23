@@ -28,7 +28,7 @@ def expand(player: Player):
     if not num_shipyards_to_create:
         return
 
-    logger.info("---- Building shipyard ----")
+    logger.info("---- Need to build shipyard ----")
     shipyard_positions = {x.point for x in board.shipyards}
 
     shipyard_to_point = find_best_position_for_shipyards(player)
@@ -56,28 +56,30 @@ def expand(player: Player):
             if distance > target_distance:
                 continue
 
-            plan = PlanRoute(shipyard.dirs_to_h(p) + p.dirs_to_h(target))
-            route = BoardRoute(shipyard.point, plan)
+            plans = shipyard.get_plans_through([p, target])
+            rs = [BoardRoute(shipyard.point, plan) for plan in plans]
 
-            if shipyard.available_ship_count < min_ship_count_for_flight_plan_len(
-                len(route.plan.to_str()) + 1
-            ):
-                continue
+            for route in rs:
+                if shipyard.available_ship_count < min_ship_count_for_flight_plan_len(
+                    len(route.plan.to_str()) + 1
+                ):
+                    continue
 
-            route_points = route.points()
-            if any(x in shipyard_positions for x in route_points):
-                continue
+                route_points = route.points()
+                if any(x in shipyard_positions for x in route_points):
+                    continue
 
-            if not is_safety_route_to_convert(route_points, player):
-                continue
+                if not is_safety_route_to_convert(route_points, player):
+                    continue
 
-            routes.append(route)
+                routes.append(route)
 
         if routes:
-            route = random.choice(routes)
+            route = max(routes, key=lambda route: route.expected_kore(board, shipyard.available_ship_count))
             route = BoardRoute(
                 shipyard.point, route.plan + PlanRoute([PlanPath(Convert)])
             )
+            logger.info(f"Building new shipyard {shipyard.point}->{route.end}")
             shipyard.action = Launch(shipyard.available_ship_count, route)
             shipyard_count += 1
 
@@ -119,8 +121,8 @@ def find_best_position_for_shipyards(player: Player):
     shipyard_to_point = {}
     for shipyard, scores in shipyard_to_scores.items():
         if scores:
-            scores = sorted(scores, key=lambda x: x["score"])
-            point = scores[-1]["point"]
+            best_pos = max(scores, key=lambda x: x["score"])
+            point = best_pos["point"]
             shipyard_to_point[shipyard] = point
 
     return shipyard_to_point
