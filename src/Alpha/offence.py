@@ -7,12 +7,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from basic import max_ships_to_spawn
-    from board import Player, Shipyard, Launch
+    from board import Player, Shipyard, Launch, DontLaunch
     from helpers import find_shortcut_routes
     from logger import logger
 else:
     from .basic import max_ships_to_spawn
-    from .board import Player, Shipyard, Launch
+    from .board import Player, Shipyard, Launch, DontLaunch
     from .helpers import find_shortcut_routes
     from .logger import logger
 
@@ -62,7 +62,7 @@ class _ShipyardTarget:
         return profit
 
 
-def capture_shipyards(agent: Player, max_attack_distance=10):
+def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to_wait: int = 10):
     board = agent.board
     agent_shipyards = [
         x for x in agent.shipyards if x.available_ship_count >= 3 and not x.action
@@ -81,6 +81,13 @@ def capture_shipyards(agent: Player, max_attack_distance=10):
     if not targets:
         return
 
+    my_ship_count = agent.ship_count
+    op_ship_count = max(x.ship_count for x in agent.opponents)
+    if my_ship_count > op_ship_count * 1.5:
+        max_attack_distance = 15
+    if my_ship_count > op_ship_count * 2:
+        max_attack_distance = 20
+
     for t in targets:
         shipyards = sorted(
             agent_shipyards, key=lambda x: t.point.distance_from(x.point)
@@ -97,6 +104,9 @@ def capture_shipyards(agent: Player, max_attack_distance=10):
             power = t.estimate_shipyard_power(distance)
 
             if sy.available_ship_count <= power:
+                if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
+                    sy.action = DontLaunch()
+                    logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
 
             num_ships_to_launch = min(sy.available_ship_count, int(power * 1.2))
@@ -109,7 +119,7 @@ def capture_shipyards(agent: Player, max_attack_distance=10):
                 num_ships_to_launch,
             )
             if routes:
-                best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch) / len(route))
+                best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
                 logger.info(
                     f"Attack shipyard {sy.point}->{t.point}"
                 )
