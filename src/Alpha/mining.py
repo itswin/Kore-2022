@@ -59,6 +59,7 @@ def mine(agent: Player):
         max_distance = 8
 
     max_distance = min(int(board.steps_left // 2), max_distance)
+    can_deplete_kore_fast = agent.shipyard_production_capacity * board.spawn_cost * 5 > agent.kore
 
     for sy in agent.shipyards:
         if sy.action:
@@ -73,37 +74,34 @@ def mine(agent: Player):
             sy, safety=safety, max_distance=max_distance
         )
 
-        route_to_score = {}
+        route_to_info = {}
         for route in routes:
             route_points = route.points()
 
             worst_score = min(point_to_score[p] for p in route_points)
-            if worst_score > 0:
-                num_ships_to_launch = free_ships
-                score_penalty = 1
-            else:
+            num_ships_to_launch = route.plan.min_fleet_size() if can_deplete_kore_fast else free_ships
+            if worst_score <= 0:
+                num_ships_to_launch = max(min(num_ships_to_launch, max_fleet_size), route.plan.min_fleet_size())
+                opp_adv = -(free_ships + worst_score)
+
                 if free_ships < mean_fleet_size:
                     continue
-                num_ships_to_launch = min(free_ships, max_fleet_size)
-                opp_adv = -(free_ships + worst_score)
-                score_penalty = 0 if opp_adv >= 0 else 1
+                if opp_adv >= 0:
+                    continue
 
-            score = route.expected_kore(board, num_ships_to_launch) / len(route) * score_penalty
-            route_to_score[route] = score
+            score = route.expected_kore(board, num_ships_to_launch) / len(route)
+            route_to_info[route] = (score, num_ships_to_launch)
 
-        if not route_to_score:
+        if not route_to_info:
             continue
 
-        best_route = max(route_to_score, key=lambda x: route_to_score[x])
-        if all(point_to_score[x] >= 1 for x in best_route):
-            num_ships_to_launch = free_ships
-        else:
-            num_ships_to_launch = min(free_ships, 199)
+        best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
+        score, num_ships_to_launch = route_to_info[best_route]
         if best_route.can_execute():
-            logger.info(f"Mining Route: {best_route.plan}, {route_to_score[best_route]}")
+            logger.info(f"Mining Route: {best_route.plan}, {score}")
             sy.action = Launch(num_ships_to_launch, best_route)
         else:
-            logger.info(f"Waiting for route: {best_route.plan}, {route_to_score[best_route]}")
+            logger.info(f"Waiting for Route: {best_route.plan}, {score}")
 
 
 # Note: Does not take into account getting a ship next to yours for damage

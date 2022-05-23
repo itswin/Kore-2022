@@ -353,11 +353,11 @@ class Shipyard(PositionObj):
         time_to_fleet_kore = defaultdict(int)
         for sh in player.shipyards:
             for f in sh.incoming_allied_fleets:
-                time_to_fleet_kore[len(f.route)] += f.expected_kore()
+                time_to_fleet_kore[f.eta] += f.expected_kore()
 
         shipyard_reinforcements = defaultdict(int)
         for f in self.incoming_allied_fleets:
-            shipyard_reinforcements[len(f.route)] += f.ship_count
+            shipyard_reinforcements[f.eta] += f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
@@ -563,6 +563,10 @@ class Player(Obj):
                         point_to_dmg[adjacent_point] = 0
                     point_to_dmg[adjacent_point] += f.ship_count
         return time_to_dmg_positions
+    
+    @cached_property
+    def shipyard_production_capacity(self):
+        return sum(x.max_ships_to_spawn for x in self.shipyards)
 
     def actions(self):
         if self.available_kore() < 0:

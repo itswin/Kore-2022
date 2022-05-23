@@ -142,7 +142,7 @@ def need_more_shipyards(player: Player) -> int:
 
     mean_fleet_distance = sum(fleet_distance) / len(fleet_distance)
 
-    shipyard_production_capacity = sum(x.max_ships_to_spawn for x in player.shipyards)
+    shipyard_production_capacity = player.shipyard_production_capacity
 
     steps_left = board.steps_left
     if steps_left > 100:
