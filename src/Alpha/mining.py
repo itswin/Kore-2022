@@ -48,7 +48,7 @@ def mine(agent: Player):
         mean_fleet_size = np.percentile(op_ship_count, 75)
         max_fleet_size = int(max(op_ship_count) * 1.1)
 
-    point_to_score = estimate_board_risk(agent)
+    point_to_shipyard_to_score = estimate_board_risk(agent)
 
     shipyard_count = len(agent.shipyards)
     if shipyard_count < 10:
@@ -78,15 +78,13 @@ def mine(agent: Player):
         for route in routes:
             route_points = route.points()
 
-            worst_score = min(point_to_score[p] for p in route_points)
+            worst_score = min(point_to_shipyard_to_score[sy][p] for p in route_points)
             num_ships_to_launch = route.plan.min_fleet_size() if can_deplete_kore_fast else free_ships
             if worst_score <= 0:
-                num_ships_to_launch = max(min(num_ships_to_launch, max_fleet_size), route.plan.min_fleet_size())
-                opp_adv = -(free_ships + worst_score)
-
+                num_ships_to_launch = max(num_ships_to_launch, -worst_score + 1)
                 if free_ships < mean_fleet_size:
                     continue
-                if opp_adv >= 0:
+                if num_ships_to_launch > free_ships:
                     continue
 
             score = route.expected_kore(board, num_ships_to_launch) / len(route)
@@ -107,22 +105,22 @@ def mine(agent: Player):
 def estimate_board_risk(player: Player):
     board = player.board
 
-    point_to_score = {}
-    for p in board:
-        (closest_friendly_sy,
-         closest_enemy_sy,
-         min_friendly_distance,
-         min_enemy_distance) = find_closest_shipyards(player, p)
+    point_to_shipyard_score = defaultdict(dict)
+    for sy in player.shipyards:
+        for p in board:
+            sy_dist = p.distance_from(sy.point)
+            (_, closest_enemy_sy,
+            _, min_enemy_distance) = find_closest_shipyards(player, p)
 
-        # Adjacent attacks
-        min_enemy_distance -= 1
-        if min_friendly_distance < min_enemy_distance:
-            point_to_score[p] = 1
-        else:
-            dt = min_friendly_distance - min_enemy_distance
-            point_to_score[p] = -closest_enemy_sy.estimate_shipyard_power(dt)
+            # Adjacent attacks
+            min_enemy_distance -= 1
+            if sy_dist < min_enemy_distance:
+                point_to_shipyard_score[sy][p] = 1
+            else:
+                dt = sy_dist - min_enemy_distance
+                point_to_shipyard_score[sy][p] = -closest_enemy_sy.estimate_shipyard_power(dt)
 
-    return point_to_score
+    return point_to_shipyard_score
 
 
 def find_shipyard_mining_routes(
