@@ -47,9 +47,13 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
         point_to_closest_shipyard[p] = closest_friendly_sy.point
 
     opponent_shipyard_points = {x.point for x in board.shipyards if x.player_id != agent.game_id}
+    adjacent_attacks = []
     for t in targets:
         min_ships_to_send = int(t.ship_count + 1)
         attacked = False
+        adjacent_action = None
+        adjacent_sy = None
+        adjacent_target_point = None
         best_candidate_sy = None
         best_candidate_time = max_time_to_wait
         best_target_point = None
@@ -66,7 +70,8 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                     continue
 
                 time_diff = target_time - sy.point.distance_from(target_point)
-                if time_diff != 0:
+                is_adjacent_attack = time_diff == 1
+                if time_diff != 0 and time_diff != 1:
                     if time_diff > 0 and time_diff < max_time_to_wait and \
                         time_diff < best_candidate_time and \
                         sy.estimate_shipyard_power(time_diff) >= min_ships_to_send:
@@ -74,6 +79,13 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                         best_candidate_time = time_diff
                         best_target_point = target_point
                     continue
+
+                if is_adjacent_attack:
+                    for p in target_point.adjacent_points:
+                        time = sy.point.distance_from(p)
+                        if time == target_time:
+                            target_point = p
+                            break
 
                 if num_ships_to_launch < min_ships_to_send:
                     continue
@@ -92,23 +104,36 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                     if is_intercept_direct_attack_route(route, agent, direct_attack_fleet=t):
                         continue
 
-                    logger.info(
-                        f"Direct attack {sy.point}->{target_point}, distance={target_time}"
-                    )
-                    sy.action = Launch(num_ships_to_launch, route)
-                    attacked = True
-                    break
+                    if is_adjacent_attack:
+                        adjacent_sy = sy
+                        adjacent_action = Launch(num_ships_to_launch, route)
+                        adjacent_target_point = target_point
+                    else:
+                        logger.info(
+                            f"Direct attack {sy.point}->{target_point}, distance={target_time}"
+                        )
+                        sy.action = Launch(num_ships_to_launch, route)
+                        attacked = True
+                        break
 
                 if attacked:
                     break
 
             if attacked:
                 break
+        if not attacked:
+            if best_candidate_sy is not None:
+                best_candidate_sy.action = DontLaunch()
+                logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, distance={best_candidate_time}")
+            elif adjacent_action is not None:
+                adjacent_attacks.append((adjacent_sy, adjacent_action, adjacent_target_point))
 
-        if not attacked and best_candidate_sy is not None:
-            best_candidate_sy.action = DontLaunch()
-            logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, distance={best_candidate_time}")
-
+    for sy, action, target_point in adjacent_attacks:
+        if sy.action is None:
+            logger.info(
+                f"Adjacent direct attack {sy.point}->{target_point}, distance={sy.point.distance_from(target_point)}"
+            )
+            sy.action = action
 
 def is_intercept_direct_attack_route(
     route: BoardRoute, player: Player, direct_attack_fleet: Fleet

@@ -114,7 +114,7 @@ def estimate_board_risk(player: Player):
          closest_enemy_sy,
          min_friendly_distance,
          min_enemy_distance) = find_closest_shipyards(player, p)
-        if min_friendly_distance < min_enemy_distance:
+        if min_friendly_distance < min_enemy_distance + 1:
             point_to_score[p] = 1
         else:
             dt = min_friendly_distance - min_enemy_distance
