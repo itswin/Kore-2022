@@ -6,13 +6,13 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute
-    from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch
+    from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard
     from helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
     from logger import logger
     from state import CoordinatedAttack
 else:
     from .geometry import PlanRoute
-    from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch
+    from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard
     from .helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
     from .logger import logger
     from .state import CoordinatedAttack
@@ -274,6 +274,22 @@ def _max_ships_to_control(agent: Player):
     return max(100, 3 * sum(x.ship_count for x in agent.opponents))
 
 
+def should_greedy_spawn(agent: Player, kore_ship_mult: float = 1.2):
+    if agent.kore < 300:
+        return False
+    board = agent.board
+    op_ship_count = max(x.ship_count for x in agent.opponents)
+    op_kore = max(x.kore for x in agent.opponents)
+    kore_surplus = agent.available_kore() - op_kore
+    ship_surplus_potential = kore_surplus // board.spawn_cost
+    ship_surplus = agent.ship_count - op_ship_count * kore_ship_mult
+    if ship_surplus < 0 and ship_surplus_potential > -ship_surplus:
+        logger.info(f"More kore but behind in ships, greedy spawn")
+        return True
+
+    return False
+
+
 def greedy_spawn(agent: Player):
     board = agent.board
 
@@ -282,11 +298,13 @@ def greedy_spawn(agent: Player):
 
     ship_count = agent.ship_count
     max_ship_count = _max_ships_to_control(agent)
+    can_greedy_spawn = should_greedy_spawn(agent)
     for shipyard in agent.shipyards:
         if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
 
-        if shipyard.ship_count > agent.ship_count * 0.2 / len(agent.shipyards):
+        if not can_greedy_spawn and \
+            shipyard.ship_count > agent.ship_count * 0.2 / len(agent.shipyards):
             continue
 
         num_ships_to_spawn = shipyard.max_ships_to_spawn
