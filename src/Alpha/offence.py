@@ -22,12 +22,13 @@ else:
 
 
 class _ShipyardTarget:
-    def __init__(self, shipyard: Shipyard):
+    def __init__(self, shipyard: Shipyard, dist_from_shipyards: int):
         self.shipyard = shipyard
         self.point = shipyard.point
         self.expected_profit = self._estimate_profit()
         self.reinforcement_distance = self._get_reinforcement_distance()
         self.total_incoming_power = self._get_total_incoming_power()
+        self.distance_from_shipyards = dist_from_shipyards
 
     def __repr__(self):
         return f"Target {self.shipyard}"
@@ -76,12 +77,13 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to
     for op_sy in board.shipyards:
         if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
             continue
-        target = _ShipyardTarget(op_sy)
-        # if target.expected_profit > 0:
+        target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
         targets.append(target)
 
     if not targets:
         return
+
+    targets.sort(key=lambda x: x.distance_from_shipyards)
 
     my_ship_count = agent.ship_count
     op_ship_count = max(x.ship_count for x in agent.opponents)
@@ -144,11 +146,13 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
     for op_sy in board.shipyards:
         if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
             continue
-        target = _ShipyardTarget(op_sy)
+        target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
         targets.append(target)
 
     if not targets:
         return
+
+    targets.sort(key=lambda x: x.distance_from_shipyards)
 
     my_ship_count = agent.ship_count
     op_ship_count = max(x.ship_count for x in agent.opponents)
