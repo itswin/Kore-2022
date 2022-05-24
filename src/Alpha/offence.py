@@ -87,10 +87,11 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to
 
     my_ship_count = agent.ship_count
     op_ship_count = max(x.ship_count for x in agent.opponents)
-    if my_ship_count > op_ship_count * 1.5:
-        max_attack_distance = 15
-    if my_ship_count > op_ship_count * 2:
-        max_attack_distance = 20
+    if my_ship_count > 100:
+        if my_ship_count > op_ship_count * 1.5:
+            max_attack_distance = 15
+        if my_ship_count > op_ship_count * 2:
+            max_attack_distance = 20
 
     for t in targets:
         shipyards = sorted(
