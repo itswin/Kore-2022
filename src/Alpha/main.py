@@ -1,5 +1,4 @@
 import os
-import sys
 import traceback
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")

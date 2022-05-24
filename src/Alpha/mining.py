@@ -104,7 +104,6 @@ def mine(agent: Player):
             logger.info(f"Waiting for Route: {best_route.plan}, {score}")
 
 
-# Note: Does not take into account getting a ship next to yours for damage
 def estimate_board_risk(player: Player):
     board = player.board
 
@@ -114,7 +113,10 @@ def estimate_board_risk(player: Player):
          closest_enemy_sy,
          min_friendly_distance,
          min_enemy_distance) = find_closest_shipyards(player, p)
-        if min_friendly_distance < min_enemy_distance + 1:
+
+        # Adjacent attacks
+        min_enemy_distance -= 1
+        if min_friendly_distance < min_enemy_distance:
             point_to_score[p] = 1
         else:
             dt = min_friendly_distance - min_enemy_distance
