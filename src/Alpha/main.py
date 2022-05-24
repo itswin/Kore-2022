@@ -1,4 +1,6 @@
 import os
+import sys
+import traceback
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
@@ -40,14 +42,18 @@ def agent(obs, conf):
     if not a.opponents:
         return {}
 
-    defend_shipyards(a)
-    save_kore(a)
-    capture_shipyards(a)
-    adjacent_attack(a)
-    direct_attack(a)
-    expand(a)
-    greedy_spawn(a)
-    mine(a)
-    spawn(a)
+    try:
+        defend_shipyards(a)
+        save_kore(a)
+        capture_shipyards(a)
+        adjacent_attack(a)
+        direct_attack(a)
+        expand(a)
+        greedy_spawn(a)
+        mine(a)
+        spawn(a)
+    except:
+        logger.error(traceback.format_exc())
+        exit()
 
     return a.actions()
