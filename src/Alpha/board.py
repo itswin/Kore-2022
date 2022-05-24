@@ -29,6 +29,7 @@ if IS_KAGGLE:
         PlanPath,
         PlanRoute,
         GAME_ID_TO_ACTION,
+        get_opposite_action,
     )
     from logger import logger
 else:
@@ -50,6 +51,7 @@ else:
         PlanPath,
         PlanRoute,
         GAME_ID_TO_ACTION,
+        get_opposite_action,
     )
     from .logger import logger
 
@@ -303,6 +305,8 @@ class Shipyard(PositionObj):
         self._guard_ship_count = 0
         self._future_ship_count = None
         self.action: Optional[_ShipyardAction] = None
+        self._blocked_dirs_at_time = None
+        self._reserved_ship_count = 0
 
     @property
     def turns_controlled(self):
@@ -318,7 +322,7 @@ class Shipyard(PositionObj):
 
     @property
     def available_ship_count(self):
-        return self._ship_count - self._guard_ship_count
+        return self._ship_count - self._guard_ship_count - self._reserved_ship_count
 
     @property
     def guard_ship_count(self):
@@ -327,6 +331,10 @@ class Shipyard(PositionObj):
     def set_guard_ship_count(self, ship_count):
         assert ship_count <= self._ship_count
         self._guard_ship_count = ship_count
+
+    def increase_reserved_ship_count(self, count):
+        self._reserved_ship_count += count
+        assert self._reserved_ship_count <= self._ship_count
 
     @cached_property
     def incoming_allied_fleets(self) -> List["Fleet"]:
@@ -387,6 +395,21 @@ class Shipyard(PositionObj):
             if self.estimate_shipyard_power(t) >= num_ships:
                 return t
         return 10000
+
+    def can_launch_to_at_time(self, point: Point, time: int) -> bool:
+        if self._blocked_dirs_at_time is None:
+            self._blocked_dirs_at_time = self._get_blocked_dirs_at_time()
+        plans = self.point.get_plans_through([point])
+        for p in plans:
+            if p.paths[0] not in self._blocked_dirs_at_time[time]:
+                return True
+        return False
+
+    def _get_blocked_dirs_at_time(self) -> List[Action]:
+        blocked_dirs_at_time = defaultdict(list)
+        for f in self.incoming_allied_fleets:
+            blocked_dirs_at_time[f.eta - 1].append(get_opposite_action(f.route.last_action()))
+        return blocked_dirs_at_time
 
 
 class Fleet(PositionObj):
@@ -496,6 +519,7 @@ class Player(Obj):
         self._kore_reserve = 0
         self._board = board
         self._start_time = time.time()
+        self.state = None
 
     @property
     def kore(self):
@@ -546,7 +570,7 @@ class Player(Obj):
         return [x for x in self.board.players if x != self]
 
     @cached_property
-    def expected_fleets_positions(self) -> Dict[int, Dict[Point, int]]:
+    def expected_fleets_positions(self) -> Dict[int, Dict[Point, Fleet]]:
         """
         time -> point -> fleet
         """
@@ -601,6 +625,10 @@ class Player(Obj):
     def time_remaining(self):
         return self.board.act_timeout - (time.time() - self._start_time)
 
+    def update_state(self):
+        self.state.act(self)
+        if self.state.is_finished():
+            self.state = self.state.next_state()
 
 _FIELD = None
 

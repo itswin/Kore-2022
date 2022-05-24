@@ -8,15 +8,17 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from geometry import Point
     from board import Board, Player, BoardRoute, PlanRoute, Shipyard
+    from logger import logger
 else:
     from .geometry import Point
     from .board import Board, Player, BoardRoute, PlanRoute, Shipyard
+    from .logger import logger
 
 # <--->
 
 
 def is_intercept_route(
-    route: BoardRoute, player: Player, safety=True, allow_shipyard_intercept=False
+    route: BoardRoute, player: Player, safety=True, allow_shipyard_intercept=False, allowed_join_point=None
 ):
     board = player.board
 
@@ -33,7 +35,8 @@ def is_intercept_route(
             is_enemy = pl != player
 
             if point in pl.expected_fleets_positions[time]:
-                return True
+                if allowed_join_point is None or pl.expected_fleets_positions[time][point].route.end != allowed_join_point:
+                    return True
 
             if safety and is_enemy:
                 if point in pl.expected_dmg_positions[time]:
@@ -50,7 +53,8 @@ def find_shortcut_routes(
     num_ships: int,
     safety: bool = True,
     allow_shipyard_intercept=False,
-    route_distance=None
+    route_distance=None,
+    allow_join=False,
 ) -> List[BoardRoute]:
     if route_distance is None:
         route_distance = start.distance_from(end)
@@ -73,6 +77,7 @@ def find_shortcut_routes(
                 player,
                 safety=safety,
                 allow_shipyard_intercept=allow_shipyard_intercept,
+                allowed_join_point=end if allow_join else None,
             ):
                 continue
 

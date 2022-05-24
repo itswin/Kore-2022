@@ -9,11 +9,13 @@ if IS_KAGGLE:
     from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch
     from helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
     from logger import logger
+    from state import CoordinatedAttack
 else:
     from .geometry import PlanRoute
     from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch
     from .helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
     from .logger import logger
+    from .state import CoordinatedAttack
 
 # <--->
 
@@ -255,6 +257,8 @@ def _find_adjacent_targets(agent: Player, max_distance: int = 5):
 
 def _need_more_ships(agent: Player, ship_count: int):
     board = agent.board
+    if isinstance(agent.state, CoordinatedAttack):
+        return True
     if board.steps_left < 10:
         return False
     if ship_count > _max_ships_to_control(agent):
@@ -290,7 +294,7 @@ def greedy_spawn(agent: Player):
             shipyard.action = Spawn(num_ships_to_spawn)
 
         ship_count += num_ships_to_spawn
-        if ship_count > max_ship_count:
+        if ship_count > max_ship_count and not isinstance(agent.state, CoordinatedAttack):
             return
 
 
@@ -312,13 +316,13 @@ def spawn(agent: Player):
         if num_ships_to_spawn:
             shipyard.action = Spawn(num_ships_to_spawn)
             ship_count += num_ships_to_spawn
-            if ship_count > max_ship_count:
+            if ship_count > max_ship_count and not isinstance(agent.state, CoordinatedAttack):
                 return
 
 
 def save_kore(agent: Player):
     board = agent.board
-    
+
     if board.steps_left < 25:
-        agent.set_kore_reserve(min(agent.kore, 1.25 * sum(x.kore for x in agent.opponents)))
+        agent.set_kore_reserve(min(agent.available_kore(), 1.25 * sum(x.kore for x in agent.opponents)))
         logger.info(f"Saved kore: {agent.kore_reserve}")
