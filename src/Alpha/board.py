@@ -329,7 +329,7 @@ class Shipyard(PositionObj):
         return self._guard_ship_count
 
     def set_guard_ship_count(self, ship_count):
-        assert ship_count <= self._ship_count
+        assert 0 <= ship_count <= self._ship_count
         self._guard_ship_count = ship_count
 
     def increase_reserved_ship_count(self, count):

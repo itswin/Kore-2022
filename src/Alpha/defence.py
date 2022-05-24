@@ -40,7 +40,8 @@ def defend_shipyards(agent: Player):
 
         ships_needed = incoming_hostile_power - incoming_allied_power
         if sy.ship_count > ships_needed:
-            sy.set_guard_ship_count(min(sy.ship_count, int(ships_needed * 1.1)))
+            if ships_needed > 0:
+                sy.set_guard_ship_count(min(sy.ship_count, int(ships_needed * 1.1)))
             continue
 
         # spawn as much as possible
