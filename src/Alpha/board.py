@@ -638,7 +638,7 @@ class Player(Obj):
         power = 0
         for sy in self.shipyards:
             sy_dist = sy.point.distance_from(point)
-            power += sy.estimate_shipyard_power(time - sy_dist)
+            power = max(power, sy.estimate_shipyard_power(time - sy_dist))
 
         return power
 
