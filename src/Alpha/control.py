@@ -68,6 +68,8 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
             num_ships_to_launch = sy.available_ship_count
 
             for target_time, target_point in enumerate(t.route, 1):
+                if target_point in opponent_shipyard_points:
+                    continue
                 if target_time > max_distance:
                     continue
 
@@ -89,7 +91,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                             target_point = p
                             break
 
-                if num_ships_to_launch < min_ships_to_send:
+                if sy.available_ship_count < min_ships_to_send:
                     continue
 
                 destination = point_to_closest_shipyard[target_point]
@@ -97,11 +99,23 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                 routes = [BoardRoute(sy.point, plan) for plan in plans]
                 routes.sort(key=lambda route: route.expected_kore(board, num_ships_to_launch))
                 for route in routes:
+                    route_points = route.points()
                     if num_ships_to_launch < route.plan.min_fleet_size():
                         continue
 
-                    if any(x in opponent_shipyard_points for x in route.points()):
+                    if any(x in opponent_shipyard_points for x in route_points):
                         continue
+
+                    board_risk = max(
+                        agent.estimate_board_risk(p, time + 1) + 
+                        (t.ship_count if (time + 1) >= target_time else 0)
+                        for time, p in enumerate(route_points)
+                    )
+
+                    if board_risk > sy.available_ship_count:
+                        continue
+
+                    num_ships_to_launch = board_risk
 
                     if is_intercept_direct_attack_route(route, agent, direct_attack_fleet=t):
                         continue

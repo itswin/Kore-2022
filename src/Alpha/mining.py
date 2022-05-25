@@ -91,6 +91,12 @@ def mine(agent: Player):
         if not route_to_info:
             continue
 
+        # items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
+        # for i in range(0, 5):
+        #     route = items[i][0]
+        #     score, num_ships_to_launch, board_risk = route_to_info[route]
+        #     logger.info(f"Mining Route: {route.plan}, {score}, {board_risk}")
+
         best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
         # for t, p in enumerate(best_route.points()):
         #     logger.info(f"{p} {t}, ")
