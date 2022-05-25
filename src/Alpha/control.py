@@ -112,10 +112,9 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                         for time, p in enumerate(route_points)
                     )
 
-                    if board_risk > sy.available_ship_count:
+                    num_ships_to_launch = max(board_risk, min_ships_to_send)
+                    if num_ships_to_launch > sy.available_ship_count:
                         continue
-
-                    num_ships_to_launch = board_risk
 
                     if is_intercept_direct_attack_route(route, agent, direct_attack_fleet=t):
                         continue
@@ -271,8 +270,6 @@ def _find_adjacent_targets(agent: Player, max_distance: int = 5):
 
 def _need_more_ships(agent: Player, ship_count: int):
     board = agent.board
-    if isinstance(agent.state, CoordinatedAttack):
-        return True
     if board.steps_left < 10:
         return False
     if ship_count > _max_ships_to_control(agent):
@@ -326,7 +323,7 @@ def greedy_spawn(agent: Player):
             shipyard.action = Spawn(num_ships_to_spawn)
 
         ship_count += num_ships_to_spawn
-        if ship_count > max_ship_count and not isinstance(agent.state, CoordinatedAttack):
+        if ship_count > max_ship_count:
             return
 
 
@@ -348,7 +345,7 @@ def spawn(agent: Player):
         if num_ships_to_spawn:
             shipyard.action = Spawn(num_ships_to_spawn)
             ship_count += num_ships_to_spawn
-            if ship_count > max_ship_count and not isinstance(agent.state, CoordinatedAttack):
+            if ship_count > max_ship_count:
                 return
 
 

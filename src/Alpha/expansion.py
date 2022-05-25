@@ -7,81 +7,55 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from basic import min_ship_count_for_flight_plan_len
-    from geometry import Point, Convert, PlanRoute, PlanPath
-    from board import Player, BoardRoute, Launch
+    from geometry import Point, Convert
+    from board import Player
     from logger import logger
     from helpers import find_closest_shipyards
+    from state import State, Expansion
 else:
-    from .basic import min_ship_count_for_flight_plan_len
-    from .geometry import Point, Convert, PlanRoute, PlanPath
+    from .geometry import Point, Convert
     from .board import Player, BoardRoute, Launch
     from .logger import logger
     from .helpers import find_closest_shipyards
+    from .state import State, Expansion
 
 # <--->
 
 
-def expand(player: Player):
+def expand(player: Player, max_time_to_wait: int = 10):
     board = player.board
+    if not player.state.can_override_with(Expansion):
+        return
     num_shipyards_to_create = need_more_shipyards(player)
     if not num_shipyards_to_create:
         return
 
     logger.info("---- Need to build shipyard ----")
-    shipyard_positions = {x.point for x in board.shipyards}
 
     shipyard_to_point = find_best_position_for_shipyards(player)
+    poses = sorted(shipyard_to_point.items(), key=lambda x: x[1]["score"], reverse=True)
 
     shipyard_count = 0
-    for shipyard, target in shipyard_to_point.items():
+    shipyard_to_target = {}
+    for shipyard, pose in poses:
         if shipyard_count >= num_shipyards_to_create:
             break
-
-        if shipyard.available_ship_count < board.shipyard_cost or shipyard.action:
-            continue
 
         incoming_hostile_fleets = shipyard.incoming_hostile_fleets
         if incoming_hostile_fleets:
             continue
 
-        target_distance = shipyard.distance_from(target)
-
-        routes = []
-        for p in board:
-            if p in shipyard_positions:
-                continue
-
-            distance = shipyard.distance_from(p) + p.distance_from(target)
-            if distance > target_distance:
-                continue
-
-            plans = shipyard.get_plans_through([p, target])
-            rs = [BoardRoute(shipyard.point, plan) for plan in plans]
-
-            for route in rs:
-                if shipyard.available_ship_count < min_ship_count_for_flight_plan_len(
-                    len(route.plan.to_str()) + 1
-                ):
-                    continue
-
-                route_points = route.points()
-                if any(x in shipyard_positions for x in route_points):
-                    continue
-
-                if not is_safety_route_to_convert(route_points, player):
-                    continue
-
-                routes.append(route)
-
-        if routes:
-            route = max(routes, key=lambda route: route.expected_kore(board, shipyard.available_ship_count))
-            route = BoardRoute(
-                shipyard.point, route.plan + PlanRoute([PlanPath(Convert)])
-            )
-            logger.info(f"Building new shipyard {shipyard.point}->{route.end}")
-            shipyard.action = Launch(shipyard.available_ship_count, route)
-            shipyard_count += 1
+        if shipyard.estimate_shipyard_power(max_time_to_wait) < board.shipyard_cost:
+            continue
+        
+        target = pose["point"]
+        shipyard_to_target[shipyard] = target
+        shipyard_count += 1
+    
+    if shipyard_to_target:
+        logger.info(f"Starting expansion: {shipyard_to_target}")
+        player.state = Expansion(shipyard_to_target)
+        player.update_state()
 
 
 def find_best_position_for_shipyards(player: Player):
@@ -111,9 +85,10 @@ def find_best_position_for_shipyards(player: Player):
 
         nearby_kore = sum(x.kore / p.distance_from(x) for x in p.nearby_points(10))
         nearby_shipyards = sum(1 for x in board.shipyards if x.distance_from(p) < 5)
-        shipyard_penalty = 200 * nearby_shipyards
+        shipyard_penalty = 50 * nearby_shipyards
         distance_penalty = 100 * min_distance
-        enemy_penalty = 0 if min_enemy_distance > 8 else 150 * (8 - min_enemy_distance)
+        enemy_penalty = 0 if min_enemy_distance >= 9 else \
+            10 * closest_enemy_sy.estimate_shipyard_power(min_friendly_distance + 3) * (9 - min_enemy_distance)
 
         score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
         shipyard_to_scores[closest_sy].append({"score": score, "point": p})
@@ -121,9 +96,7 @@ def find_best_position_for_shipyards(player: Player):
     shipyard_to_point = {}
     for shipyard, scores in shipyard_to_scores.items():
         if scores:
-            best_pos = max(scores, key=lambda x: x["score"])
-            point = best_pos["point"]
-            shipyard_to_point[shipyard] = point
+            shipyard_to_point[shipyard] = max(scores, key=lambda x: x["score"])
 
     return shipyard_to_point
 
@@ -188,32 +161,3 @@ def need_more_shipyards(player: Player) -> int:
 
     return max(0, 5 - (expected_shipyard_count - current_shipyard_count))
 
-
-def is_safety_route_to_convert(route_points: List[Point], player: Player):
-    board = player.board
-
-    target_point = route_points[-1]
-    target_time = len(route_points)
-    for pl in board.players:
-        if pl != player:
-            for t, positions in pl.expected_fleets_positions.items():
-                if t >= target_time and target_point in positions:
-                    return False
-
-    shipyard_positions = {x.point for x in board.shipyards}
-
-    for time, point in enumerate(route_points):
-        for pl in board.players:
-            if point in shipyard_positions:
-                return False
-
-            is_enemy = pl != player
-
-            if point in pl.expected_fleets_positions[time]:
-                return False
-
-            if is_enemy:
-                if point in pl.expected_dmg_positions[time]:
-                    return False
-
-    return True

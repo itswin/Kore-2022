@@ -133,7 +133,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to
 
 # Incoporate waiting also?
 def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, send_fraction: float = 0.7):
-    if not isinstance(agent.state, State):
+    if not agent.state.can_override_with(CoordinatedAttack):
         return
 
     board = agent.board
