@@ -519,6 +519,7 @@ class Player(Obj):
         self._kore_reserve = 0
         self._board = board
         self._start_time = time.time()
+        self._board_risk = None
         self.state = None
 
     @property
@@ -629,6 +630,47 @@ class Player(Obj):
         self.state.act(self)
         if self.state.is_finished():
             self.state = self.state.next_state()
+
+    def estimate_power_for_point_at_time(self, point: Point, time: int) -> int:
+        if time < 0:
+            return 0
+
+        power = 0
+        for sy in self.shipyards:
+            sy_dist = sy.point.distance_from(point)
+            power += sy.estimate_shipyard_power(time - sy_dist)
+
+        return power
+
+    def estimate_board_risk(self, p: Point, time: int, max_time: int = 20) -> int:
+        if self._board_risk is None:
+            self._board_risk = self._estimate_board_risk()
+        if time < 0:
+            return 0
+        return self._board_risk[p][min(time, max_time)]
+
+    def _estimate_board_risk(self, max_time: int = 20) -> Dict[Point, Dict[int, int]]:
+        board = self.board
+        opps = self.opponents
+        if len(opps) < 1:
+            return {}
+        opp = opps[0]
+
+        point_to_time_to_score = defaultdict(dict)
+        for p in board:
+            for dt in range(max_time + 1):
+                point_to_time_to_score[p][dt] = opp.estimate_power_for_point_at_time(p, dt)
+
+        adj_point_to_time_to_score = defaultdict(dict)
+        for p in board:
+            for dt in range(max_time + 1):
+                adj_point_to_time_to_score[p][dt] = max(
+                    point_to_time_to_score[adj_p][dt]
+                    for adj_p in p.adjacent_points
+                )
+
+        return adj_point_to_time_to_score
+
 
 _FIELD = None
 

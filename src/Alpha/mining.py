@@ -48,8 +48,6 @@ def mine(agent: Player):
         mean_fleet_size = np.percentile(op_ship_count, 75)
         max_fleet_size = int(max(op_ship_count) * 1.1)
 
-    point_to_shipyard_to_score = estimate_board_risk(agent)
-
     shipyard_count = len(agent.shipyards)
     if shipyard_count < 10:
         max_distance = 15
@@ -78,49 +76,31 @@ def mine(agent: Player):
         for route in routes:
             route_points = route.points()
 
-            worst_score = min(point_to_shipyard_to_score[sy][p] for p in route_points)
+            board_risk = max(agent.estimate_board_risk(p, t + 1) for t, p in enumerate(route_points))
             num_ships_to_launch = route.plan.min_fleet_size() if can_deplete_kore_fast else free_ships
-            if worst_score <= 0:
-                num_ships_to_launch = max(num_ships_to_launch, -worst_score + 1)
+            if board_risk > 0:
+                num_ships_to_launch = max(num_ships_to_launch, board_risk + 1)
                 if free_ships < mean_fleet_size:
                     continue
                 if num_ships_to_launch > free_ships:
                     continue
 
             score = route.expected_kore(board, num_ships_to_launch) / len(route)
-            route_to_info[route] = (score, num_ships_to_launch)
+            route_to_info[route] = (score, num_ships_to_launch, board_risk)
 
         if not route_to_info:
             continue
 
         best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
-        score, num_ships_to_launch = route_to_info[best_route]
+        # for t, p in enumerate(best_route.points()):
+        #     logger.info(f"{p} {t}, ")
+        score, num_ships_to_launch, board_risk = route_to_info[best_route]
         if best_route.can_execute():
-            logger.info(f"Mining Route: {best_route.plan}, {score}")
+            logger.info(f"Mining Route: {best_route.plan}, {score}, {board_risk}")
             sy.action = Launch(num_ships_to_launch, best_route)
         else:
-            logger.info(f"Waiting for Route: {best_route.plan}, {score}")
+            logger.info(f"Waiting for Route: {best_route.plan}, {score}, {board_risk}")
 
-
-def estimate_board_risk(player: Player):
-    board = player.board
-
-    point_to_shipyard_score = defaultdict(dict)
-    for sy in player.shipyards:
-        for p in board:
-            sy_dist = p.distance_from(sy.point)
-            (_, closest_enemy_sy,
-            _, min_enemy_distance) = find_closest_shipyards(player, p)
-
-            # Adjacent attacks
-            min_enemy_distance -= 1
-            if sy_dist < min_enemy_distance:
-                point_to_shipyard_score[sy][p] = 1
-            else:
-                dt = sy_dist - min_enemy_distance
-                point_to_shipyard_score[sy][p] = -closest_enemy_sy.estimate_shipyard_power(dt)
-
-    return point_to_shipyard_score
 
 
 def find_shipyard_mining_routes(
