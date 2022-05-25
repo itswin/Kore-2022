@@ -641,14 +641,14 @@ class Player(Obj):
         )
         return power
 
-    def estimate_board_risk(self, p: Point, time: int, max_time: int = 20) -> int:
+    def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
         if self._board_risk is None:
             self._board_risk = self._estimate_board_risk()
         if time < 0:
             return 0
         return self._board_risk[p][min(time, max_time)]
 
-    def _estimate_board_risk(self, max_time: int = 20) -> Dict[Point, Dict[int, int]]:
+    def _estimate_board_risk(self, max_time: int = 40) -> Dict[Point, Dict[int, int]]:
         board = self.board
         opps = self.opponents
         if len(opps) < 1:
