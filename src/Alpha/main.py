@@ -46,8 +46,8 @@ def agent(obs, conf):
         return {}
 
     try:
+        logger.info(f"State: {prev_state}")
         a.state = prev_state
-        a.update_state()
 
         defend_shipyards(a)
         save_kore(a)

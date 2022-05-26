@@ -73,4 +73,5 @@ def defend_shipyards(agent: Player):
                         other_sy.available_ship_count, random.choice(routes)
                     )
             elif distance < incoming_hostile_time - 1:
+                logger.info(f"Saving reinforcements for {other_sy.point}->{sy.point}")
                 other_sy.set_guard_ship_count(other_sy.ship_count)

@@ -631,14 +631,22 @@ class Player(Obj):
         if self.state.is_finished():
             self.state = self.state.next_state()
 
+    def update_state_if_is(self, state_class):
+        res = self.state.__repr__() != "State"
+        if isinstance(self.state, state_class):
+            self.update_state()
+            return True
+        return res
+
     def estimate_power_for_point_at_time(self, point: Point, time: int) -> int:
         if time < 0:
             return 0
 
-        power = max(
-            sy.estimate_shipyard_power(time - sy.point.distance_from(point))
-            for sy in self.shipyards
-        )
+        power = 0
+        for sy in self.shipyards:
+            sy_dist = sy.point.distance_from(point)
+            power = max(power, sy.estimate_shipyard_power(time - sy_dist))
+
         return power
 
     def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
