@@ -58,17 +58,17 @@ class CoordinatedAttack(State):
                     break
 
             if not found_sy:
-                logger.error(f"Error: CoordinatedAttack: Could not find shipyard {sy.point}. It may have been taken")
+                logger.error(f"CoordinatedAttack: Could not find shipyard {sy.point}. It may have been taken")
                 continue
 
             if wait_time <= -self._max_timeout:
-                logger.error(f"Error: CoordinatedAttack: Waited too long for {sy.point} to find routes. Skipping")
+                logger.error(f"CoordinatedAttack: Waited too long for {sy.point} to find routes. Skipping")
                 continue
 
             num_ships_to_launch = min(sy.available_ship_count, int(power * 1.2))
             if wait_time <= 0:
                 if sy.available_ship_count < power:
-                    logger.info(f"Error: CoordinatedAttack: {sy} has {sy.available_ship_count} ships, but {power} power")
+                    logger.info(f"CoordinatedAttack: {sy} has {sy.available_ship_count} ships, but {power} power")
                 routes = find_shortcut_routes(
                     board,
                     sy.point,
@@ -132,11 +132,11 @@ class Expansion(State):
                     break
 
             if not found_sy:
-                logger.error(f"Error: Expansion: Could not find shipyard {sy.point}. It may have been taken")
+                logger.error(f"Expansion: Could not find shipyard {sy.point}. It may have been taken")
                 continue
 
             if sy.action:
-                logger.error(f"Error: Expansion: {sy.point} already has action {sy.action}")
+                logger.error(f"Expansion: {sy.point} already has action {sy.action}")
                 new_shipyard_to_target[sy] = target
                 continue
 
