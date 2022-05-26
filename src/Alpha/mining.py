@@ -78,11 +78,9 @@ def mine(agent: Player):
 
             board_risk = max(agent.estimate_board_risk(p, t + 1) for t, p in enumerate(route_points))
             num_ships_to_launch = route.plan.min_fleet_size() if can_deplete_kore_fast else free_ships
-            if board_risk > 0:
-                num_ships_to_launch = max(num_ships_to_launch, board_risk + 1)
-                if free_ships < mean_fleet_size:
-                    continue
-                if num_ships_to_launch > free_ships:
+            if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
+                num_ships_to_launch = min(free_ships, board_risk + 1)
+                if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                     continue
 
             score = route.expected_kore(board, num_ships_to_launch) / len(route)

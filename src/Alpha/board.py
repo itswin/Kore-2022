@@ -650,15 +650,20 @@ class Player(Obj):
 
         return power
 
-    def _estimate_ship_usage(self, ship_count: int) -> int:
-        return ship_count // 2
+    def is_board_risk_worth(self, risk: int, num_ships: int, sy: Shipyard) -> bool:
+        if risk >= num_ships:
+            if self.board.step < 50 or self.ship_count < 50 or \
+                num_ships > 0.2 * self.ship_count or num_ships > 0.5 * sy.estimate_shipyard_power(10):
+                return False
+            return num_ships > risk // 2
+        return True
 
     def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
         if self._board_risk is None:
             self._board_risk = self._estimate_board_risk()
         if time < 0:
             return 0
-        return self._estimate_ship_usage(self._board_risk[p][min(time, max_time)])
+        return self._board_risk[p][min(time, max_time)]
 
     def _estimate_board_risk(self, max_time: int = 40) -> Dict[Point, Dict[int, int]]:
         board = self.board

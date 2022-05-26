@@ -112,8 +112,8 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                         for time, p in enumerate(route_points)
                     )
 
-                    num_ships_to_launch = max(board_risk, min_ships_to_send)
-                    if num_ships_to_launch > sy.available_ship_count:
+                    num_ships_to_launch = min(board_risk + 1, sy.available_ship_count)
+                    if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                         continue
 
                     if is_intercept_direct_attack_route(route, agent, direct_attack_fleet=t):
