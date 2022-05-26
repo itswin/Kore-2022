@@ -635,11 +635,10 @@ class Player(Obj):
         if time < 0:
             return 0
 
-        power = 0
-        for sy in self.shipyards:
-            sy_dist = sy.point.distance_from(point)
-            power = max(power, sy.estimate_shipyard_power(time - sy_dist))
-
+        power = max(
+            sy.estimate_shipyard_power(time - sy.point.distance_from(point))
+            for sy in self.shipyards
+        )
         return power
 
     def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
