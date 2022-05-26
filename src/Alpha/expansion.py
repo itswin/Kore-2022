@@ -85,10 +85,10 @@ def find_best_position_for_shipyards(player: Player):
 
         nearby_kore = sum(x.kore / p.distance_from(x) for x in p.nearby_points(10))
         nearby_shipyards = sum(1 for x in board.shipyards if x.distance_from(p) < 5)
-        shipyard_penalty = 50 * nearby_shipyards
+        shipyard_penalty = 100 * nearby_shipyards
         distance_penalty = 100 * min_distance
         enemy_penalty = 0 if min_enemy_distance >= 9 else \
-            10 * closest_enemy_sy.estimate_shipyard_power(min_friendly_distance + 3) * (9 - min_enemy_distance)
+            3 * closest_enemy_sy.estimate_shipyard_power(min_friendly_distance + 3) * (9 - min_enemy_distance)
 
         score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
         shipyard_to_scores[closest_sy].append({"score": score, "point": p})

@@ -37,10 +37,11 @@ class State:
 
 
 class CoordinatedAttack(State):
-    def __init__(self, shipyard_to_launch: Dict[Shipyard, Tuple[int, int]], target: Point):
+    def __init__(self, shipyard_to_launch: Dict[Shipyard, Tuple[int, int]], target: Point, max_timeout: int = 5):
         super().__init__()
         self.shipyard_to_launch = shipyard_to_launch
         self.target = target
+        self._max_timeout = max_timeout
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.shipyard_to_launch}, {self.target})"
@@ -58,6 +59,10 @@ class CoordinatedAttack(State):
 
             if not found_sy:
                 logger.error(f"Error: CoordinatedAttack: Could not find shipyard {sy.point}. It may have been taken")
+                continue
+
+            if wait_time <= -self._max_timeout:
+                logger.error(f"Error: CoordinatedAttack: Waited too long for {sy.point} to find routes. Skipping")
                 continue
 
             num_ships_to_launch = min(sy.available_ship_count, int(power * 1.2))
@@ -80,14 +85,15 @@ class CoordinatedAttack(State):
                     )
                     sy.action = Launch(num_ships_to_launch, best_route)
                 else:
+                    logger.info(f"CoordinatedAttack: No routes found for {sy.point}->{self.target}")
                     self._spawn(agent, sy)
                     new_shipyard_to_launch[sy] = (power, wait_time - 1)
             else:
+                logger.info(f"CoordinatedAttack: Not time for {sy.point} to send ships {self.target}")
                 self._spawn(agent, sy)
                 new_shipyard_to_launch[sy] = (power, wait_time - 1)
 
         self.shipyard_to_launch = new_shipyard_to_launch
-        # logger.info(f"Coordinated attack: {self.shipyard_to_launch}")
 
     def is_finished(self):
         return not self.shipyard_to_launch

@@ -46,7 +46,8 @@ def agent(obs, conf):
         return {}
 
     try:
-        logger.info(f"State: {prev_state}")
+        if prev_state.__repr__() != "State":
+            logger.info(f"State: {prev_state}")
         a.state = prev_state
 
         defend_shipyards(a)

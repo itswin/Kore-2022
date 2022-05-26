@@ -178,13 +178,30 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
             last_max = shipyards[i-1].point.distance_from(t.point)
             assert last_max == max_sy_dist
 
-            for sy in shipyards[:i]:
+            j = 0
+            num_shipyards_used = 0
+            while num_shipyards_used < i and j < len(shipyards):
+                sy = shipyards[j]
                 wait_time = max_sy_dist - t.point.distance_from(sy.point)
                 if sy.can_launch_to_at_time(t.point, wait_time):
                     power = floor(sy.estimate_shipyard_power(wait_time) * send_fraction)
-                    total_power += power
-                    shipyard_to_launch[sy] = (power, wait_time)
+                    routes = find_shortcut_routes(
+                        board,
+                        sy.point,
+                        t.point,
+                        agent,
+                        power,
+                        allow_join=True
+                    )
 
+                    if routes:
+                        total_power += power
+                        shipyard_to_launch[sy] = (power, wait_time)
+                        num_shipyards_used += 1
+                j += 1
+
+            if j == len(shipyards):
+                break
             if total_power >= t.estimate_shipyard_power(max_sy_dist):
                 loaded_attack = True
                 break
