@@ -1,6 +1,7 @@
 import os
 import random
 from typing import List, Tuple
+from math import pi, exp
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
@@ -150,3 +151,7 @@ def is_safety_route_to_convert(route_points: List[Point], player: Player):
                     return False
 
     return True
+
+
+def gaussian(x, mu, sigma):
+    return 1 / (sigma * (2 * pi) ** 0.5) * exp(-0.5 * (x - mu) ** 2 / sigma ** 2)

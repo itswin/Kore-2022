@@ -10,13 +10,13 @@ if IS_KAGGLE:
     from geometry import Convert
     from board import Player
     from logger import logger
-    from helpers import find_closest_shipyards
+    from helpers import find_closest_shipyards, gaussian
     from state import Expansion
 else:
     from .geometry import Convert
     from .board import Player
     from .logger import logger
-    from .helpers import find_closest_shipyards
+    from .helpers import find_closest_shipyards, gaussian
     from .state import Expansion
 
 # <--->
@@ -79,11 +79,17 @@ def find_best_position_for_shipyards(player: Player):
             not closest_sy
             or closest_sy.player_id != player.game_id
             or min_distance < 3
-            or min_distance > 5
+            or min_distance > 6
         ):
             continue
 
-        nearby_kore = sum(x.kore / p.distance_from(x) for x in p.nearby_points(10))
+        kore_mu = 0
+        kore_sigma = 5
+        gaussian_mid = gaussian(0, kore_mu, kore_sigma)
+        nearby_kore = sum(
+            (x.kore ** 1.1) * gaussian(p.distance_from(x), kore_mu, kore_sigma) / gaussian_mid
+            for x in p.nearby_points(10)
+        )
         nearby_shipyards = sum(1 for x in board.shipyards if x.distance_from(p) < 5)
         shipyard_penalty = 100 * nearby_shipyards
         distance_penalty = 100 * min_distance
@@ -91,12 +97,22 @@ def find_best_position_for_shipyards(player: Player):
             3 * closest_enemy_sy.estimate_shipyard_power(min_friendly_distance + 3) * (9 - min_enemy_distance)
 
         score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
-        shipyard_to_scores[closest_sy].append({"score": score, "point": p})
+        shipyard_to_scores[closest_sy].append({
+            "score": score,
+            "point": p,
+            "shipyard_penalty": shipyard_penalty,
+            "distance_penalty": distance_penalty,
+            "enemy_penalty": enemy_penalty,
+        })
 
     shipyard_to_point = {}
     for shipyard, scores in shipyard_to_scores.items():
         if scores:
             shipyard_to_point[shipyard] = max(scores, key=lambda x: x["score"])
+            scores.sort(key=lambda x: x["score"], reverse=True)
+            for i in range(0, min(2, len(scores))):
+                pose = scores[i]
+                logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Shipyard penalty: {pose['shipyard_penalty']}, Distance penalty: {pose['distance_penalty']}, Enemy penalty: {pose['enemy_penalty']}")
 
     return shipyard_to_point
 

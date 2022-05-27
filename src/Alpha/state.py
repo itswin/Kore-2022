@@ -184,6 +184,7 @@ class Expansion(State):
                 sy.action = Launch(sy.available_ship_count, route)
             else:
                 logger.info(f"No routes for {sy.point}->{target}")
+                sy.action = DontLaunch()
                 new_shipyard_to_target[sy] = target
 
         self.shipyard_to_target = new_shipyard_to_target
