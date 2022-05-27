@@ -102,15 +102,17 @@ def is_inevitable_victory(player: Player):
     return player_kore > opponent_kore + board_kore
 
 
-def find_closest_shipyards(player: Player, p: Point) -> Tuple[Shipyard, Shipyard, int, int]:
+def find_closest_shipyards(player: Player, p: Point, shipyards=None) -> Tuple[Shipyard, Shipyard, int, int]:
     board = player.board
     closest_friendly_sy = None
     closest_enemy_sy = None
     min_friendly_distance = 100000
     min_enemy_distance = 100000
 
-    for shipyard in board.shipyards:
-        distance = shipyard.point.distance_from(p)
+    if shipyards is None:
+        shipyards = board.shipyards
+    for shipyard in shipyards:
+        distance = shipyard.distance_from(p)
         if shipyard.player_id != player.game_id:
             if distance < min_enemy_distance:
                 closest_enemy_sy = shipyard

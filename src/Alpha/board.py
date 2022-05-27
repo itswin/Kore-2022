@@ -603,6 +603,7 @@ class Player(Obj):
         self._board = board
         self._start_time = time.time()
         self._board_risk = None
+        self._board_risk_not_adj = None
         self.state = None
 
     @property
@@ -734,6 +735,11 @@ class Player(Obj):
             for sy in self.shipyards),
             default=0
         )
+        power = max(
+            (sy.estimate_shipyard_power(time - sy.distance_from(point))
+            for sy in self.future_shipyards),
+            default=power
+        )
 
         return power
 
@@ -747,10 +753,17 @@ class Player(Obj):
 
     def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
         if self._board_risk is None:
-            self._board_risk = self._estimate_board_risk()
+            self._board_risk, self._board_risk_not_adj = self._estimate_board_risk()
         if time < 0:
             return 0
         return self._board_risk[p][min(time, max_time)]
+
+    def estimate_board_risk_not_adj(self, p: Point, time: int, max_time: int = 40) -> int:
+        if self._board_risk is None:
+            self._board_risk, self._board_risk_not_adj = self._estimate_board_risk()
+        if time < 0:
+            return 0
+        return self._board_risk_not_adj[p][min(time, max_time)]
 
     def _estimate_board_risk(self, max_time: int = 40) -> Dict[Point, Dict[int, int]]:
         board = self.board
@@ -772,7 +785,7 @@ class Player(Obj):
                     for adj_p in p.adjacent_points
                 )
 
-        return adj_point_to_time_to_score
+        return adj_point_to_time_to_score, point_to_time_to_score
 
 
 _FIELD = None

@@ -23,8 +23,6 @@ else:
 
 
 def expand(player: Player, max_time_to_wait: int = 10):
-    if player.update_state_if_is(Expansion):
-        return
     board = player.board
     num_shipyards_to_create = need_more_shipyards(player)
     if not num_shipyards_to_create:
@@ -60,7 +58,6 @@ def expand(player: Player, max_time_to_wait: int = 10):
 
 def find_best_position_for_shipyards(player: Player):
     board = player.board
-    shipyards = board.shipyards
 
     shipyard_to_scores = defaultdict(list)
     for p in board:
@@ -71,6 +68,18 @@ def find_best_position_for_shipyards(player: Player):
          closest_enemy_sy,
          min_friendly_distance,
          min_enemy_distance) = find_closest_shipyards(player, p)
+
+        (_,
+         closest_future_enemy_sy,
+         min_future_friendly_distance,
+         min_future_enemy_distance) = find_closest_shipyards(player, p, board.future_shipyards)
+
+        # Don't use points near where we're expanding now
+        if min_friendly_distance > min_future_friendly_distance:
+            continue
+
+        closest_enemy_sy = closest_enemy_sy if min_enemy_distance < min_future_enemy_distance else closest_future_enemy_sy
+        min_enemy_distance = min(min_enemy_distance, min_future_enemy_distance)
 
         closest_sy = closest_friendly_sy if min_friendly_distance < min_enemy_distance else closest_enemy_sy
         min_distance = min(min_friendly_distance, min_enemy_distance)
@@ -94,7 +103,7 @@ def find_best_position_for_shipyards(player: Player):
         shipyard_penalty = 100 * nearby_shipyards
         distance_penalty = 100 * min_distance
         enemy_penalty = 0 if min_enemy_distance >= 9 else \
-            3 * closest_enemy_sy.estimate_shipyard_power(min_friendly_distance + 3) * (9 - min_enemy_distance)
+            3 * player.estimate_board_risk(p, min_friendly_distance + 3) * (9 - min_enemy_distance)
 
         score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
         shipyard_to_scores[closest_sy].append({
@@ -109,16 +118,18 @@ def find_best_position_for_shipyards(player: Player):
     for shipyard, scores in shipyard_to_scores.items():
         if scores:
             shipyard_to_point[shipyard] = max(scores, key=lambda x: x["score"])
-            scores.sort(key=lambda x: x["score"], reverse=True)
-            for i in range(0, min(2, len(scores))):
-                pose = scores[i]
-                logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Shipyard penalty: {pose['shipyard_penalty']}, Distance penalty: {pose['distance_penalty']}, Enemy penalty: {pose['enemy_penalty']}")
+            # scores.sort(key=lambda x: x["score"], reverse=True)
+            # for i in range(0, min(2, len(scores))):
+            #     pose = scores[i]
+            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Shipyard penalty: {pose['shipyard_penalty']}, Distance penalty: {pose['distance_penalty']}, Enemy penalty: {pose['enemy_penalty']}")
 
     return shipyard_to_point
 
 
 def need_more_shipyards(player: Player) -> int:
     board = player.board
+    if isinstance(player.state, Expansion):
+        return True
 
     if player.ship_count < 100:
         return 0
