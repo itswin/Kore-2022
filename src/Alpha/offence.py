@@ -8,15 +8,17 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from basic import max_ships_to_spawn
     from board import Player, Shipyard, Launch, DontLaunch
+    from geometry import Point
     from helpers import find_shortcut_routes
     from logger import logger
-    from state import State, CoordinatedAttack
+    from state import CoordinatedAttack
 else:
     from .basic import max_ships_to_spawn
     from .board import Player, Shipyard, Launch, DontLaunch
+    from .geometry import Point
     from .helpers import find_shortcut_routes
     from .logger import logger
-    from .state import State, CoordinatedAttack
+    from .state import CoordinatedAttack
 
 # <--->
 
@@ -64,8 +66,13 @@ class _ShipyardTarget:
         profit += spawn_cost * board.shipyard_cost
         return profit
 
+    def can_attack_from(self, point: Point) -> bool:
+        if isinstance(self.shipyard, Shipyard):
+            return True
+        return self.shipyard.time_to_build < self.point.distance_from(point)
 
-def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to_wait: int = 10):
+
+def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_wait: int = 10):
     board = agent.board
     agent_shipyards = [
         x for x in agent.shipyards if x.available_ship_count >= 3 and not x.action
@@ -74,11 +81,15 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to
         return
 
     targets = []
-    for op_sy in board.shipyards:
-        if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
-            continue
-        target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
-        targets.append(target)
+    def add_targets(shipyards):
+        for op_sy in shipyards:
+            if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
+                continue
+            target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
+            targets.append(target)
+
+    add_targets(board.shipyards)
+    add_targets(board.future_shipyards)
 
     if not targets:
         return
@@ -102,7 +113,10 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to
             if sy.action:
                 continue
 
-            distance = sy.point.distance_from(t.point)
+            if not t.can_attack_from(sy.point):
+                continue
+
+            distance = sy.distance_from(t.point)
             if distance > max_attack_distance:
                 continue
 
@@ -133,7 +147,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10,  max_time_to
 
 
 # Incoporate waiting also?
-def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, send_fraction: float = 0.7):
+def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, send_fraction: float = 1):
     if agent.update_state_if_is(CoordinatedAttack):
         return
 
@@ -145,11 +159,15 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
         return
 
     targets = []
-    for op_sy in board.shipyards:
-        if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
-            continue
-        target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
-        targets.append(target)
+    def add_targets(shipyards):
+        for op_sy in shipyards:
+            if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
+                continue
+            target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
+            targets.append(target)
+
+    add_targets(board.shipyards)
+    add_targets(board.future_shipyards)
 
     if not targets:
         return
@@ -158,10 +176,11 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
 
     my_ship_count = agent.ship_count
     op_ship_count = max(x.ship_count for x in agent.opponents)
-    if my_ship_count > op_ship_count * 1.5:
-        max_attack_distance = 15
-    if my_ship_count > op_ship_count * 2:
-        max_attack_distance = 20
+    if my_ship_count > 100:
+        if my_ship_count > op_ship_count * 1.5:
+            max_attack_distance = 15
+        if my_ship_count > op_ship_count * 2:
+            max_attack_distance = 20
 
     for t in targets:
         shipyards = filter(
@@ -174,8 +193,8 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
         for i in range(1, len(shipyards) + 1):
             shipyard_to_launch = {}
             total_power = 0
-            max_sy_dist = max(x.point.distance_from(t.point) for x in shipyards[:i])
-            last_max = shipyards[i-1].point.distance_from(t.point)
+            max_sy_dist = max(x.distance_from(t.point) for x in shipyards[:i])
+            last_max = shipyards[i-1].distance_from(t.point)
             assert last_max == max_sy_dist
 
             j = 0
@@ -183,7 +202,7 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
             while num_shipyards_used < i and j < len(shipyards):
                 sy = shipyards[j]
                 wait_time = max_sy_dist - t.point.distance_from(sy.point)
-                if sy.can_launch_to_at_time(t.point, wait_time):
+                if sy.can_launch_to_at_time(t.point, wait_time) and t.can_attack_from(sy.point):
                     power = floor(sy.estimate_shipyard_power(wait_time) * send_fraction)
                     routes = find_shortcut_routes(
                         board,

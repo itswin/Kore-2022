@@ -138,7 +138,7 @@ def find_shipyard_mining_routes(
 
         dest_sy = min(destinations, key=lambda x: c.distance_from(x.point))
         future_dest_sys = list(filter(
-            lambda x: x.time_to_build <= x.point.distance_from(c) + sy.point.distance_from(c),
+            lambda x: x.time_to_build <= x.distance_from(c) + sy.distance_from(c),
             future_destinations
         ))
 

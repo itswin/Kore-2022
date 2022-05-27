@@ -60,7 +60,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
         best_candidate_time = max_time_to_wait
         best_target_point = None
 
-        shipyards.sort(key=lambda x: x.distance_from(t.point))
+        shipyards.sort(key=lambda x: x.distance_from(t))
         for sy in shipyards:
             if sy.action or sy.estimate_shipyard_power(max_time_to_wait) < min_ships_to_send:
                 continue
@@ -86,7 +86,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
 
                 if is_adjacent_attack:
                     for p in target_point.adjacent_points:
-                        time = sy.point.distance_from(p)
+                        time = sy.distance_from(p)
                         if time == target_time:
                             target_point = p
                             break
@@ -146,7 +146,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
     for sy, action, target_point in adjacent_attacks:
         if sy.action is None:
             logger.info(
-                f"Adjacent direct attack {sy.point}->{target_point}, distance={sy.point.distance_from(target_point)}"
+                f"Adjacent direct attack {sy.point}->{target_point}, distance={sy.distance_from(target_point)}"
             )
             sy.action = action
 

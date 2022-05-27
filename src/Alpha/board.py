@@ -467,7 +467,8 @@ class FutureShipyard(PositionObj):
 
         shipyard_reinforcements = defaultdict(int)
         for f in self.incoming_allied_fleets:
-            shipyard_reinforcements[f.eta] += f.ship_count
+            if f.game_id != self.game_id:
+                shipyard_reinforcements[f.eta] += f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
@@ -729,7 +730,7 @@ class Player(Obj):
             return 0
 
         power = max(
-            (sy.estimate_shipyard_power(time - sy.point.distance_from(point))
+            (sy.estimate_shipyard_power(time - sy.distance_from(point))
             for sy in self.shipyards),
             default=0
         )
