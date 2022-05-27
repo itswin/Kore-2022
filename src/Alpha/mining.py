@@ -116,12 +116,17 @@ def find_shipyard_mining_routes(
     departure = sy.point
     player = sy.player
 
-    destinations = set()
-    for shipyard in sy.player.shipyards:
-        siege = sum(x.ship_count for x in shipyard.incoming_hostile_fleets)
-        if siege >= shipyard.ship_count:
-            continue
-        destinations.add(shipyard.point)
+    def get_destinations(shipyards):
+        destinations = set()
+        for shipyard in shipyards:
+            siege = sum(x.ship_count for x in shipyard.incoming_hostile_fleets)
+            if siege >= shipyard.ship_count:
+                continue
+            destinations.add(shipyard)
+        return destinations
+
+    destinations = get_destinations(sy.player.shipyards)
+    future_destinations = get_destinations(sy.player.future_shipyards)
 
     if not destinations:
         return []
@@ -131,7 +136,17 @@ def find_shipyard_mining_routes(
         if c == departure or c in destinations:
             continue
 
-        destination = min(destinations, key=lambda x: c.distance_from(x))
+        dest_sy = min(destinations, key=lambda x: c.distance_from(x.point))
+        future_dest_sys = list(filter(
+            lambda x: x.time_to_build <= x.point.distance_from(c) + sy.point.distance_from(c),
+            future_destinations
+        ))
+
+        if future_dest_sys:
+            future_dest_sy = min(future_dest_sys, key=lambda x: c.distance_from(x.point))
+            dest_sy = min([dest_sy, future_dest_sy], key=lambda x: c.distance_from(x.point))
+
+        destination = dest_sy.point
         plans = departure.get_plans_through([c, destination])
 
         for plan in plans:

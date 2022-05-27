@@ -412,6 +412,81 @@ class Shipyard(PositionObj):
         return blocked_dirs_at_time
 
 
+class FutureShipyard(PositionObj):
+    def __init__(self, *args, time_to_build: int, fleet_power: int, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._time_to_build = time_to_build
+        self._fleet_power = fleet_power
+        self._future_ship_count = None
+        self._ship_count = fleet_power - 50
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self._game_id}, position={self._point}, player={self._player_id}, time_to_build={self._time_to_build}, fleet_power={self._fleet_power})"
+
+    @property
+    def time_to_build(self):
+        return self._time_to_build
+
+    @property
+    def ship_count(self):
+        return self._ship_count
+
+    @cached_property
+    def incoming_allied_fleets(self) -> List["Fleet"]:
+        fleets = []
+        for f in self.board.fleets:
+            if f.player_id == self.player_id and f.route.end == self.point:
+                fleets.append(f)
+        return fleets
+
+    @cached_property
+    def incoming_hostile_fleets(self) -> List["Fleet"]:
+        fleets = []
+        for f in self.board.fleets:
+            if f.player_id != self.player_id and f.route.end == self.point:
+                fleets.append(f)
+        return fleets
+
+    def estimate_shipyard_power(self, time):
+        if self._future_ship_count is None:
+            self._future_ship_count = self._estimate_future_ship_count()
+        if time < 0:
+            return 0
+        if len(self._future_ship_count) <= time:
+            return self._future_ship_count[-1]
+        return self._future_ship_count[time]
+
+    def _estimate_future_ship_count(self):
+        player = self.player
+        board = self.board
+
+        time_to_fleet_kore = defaultdict(int)
+        for sh in player.shipyards:
+            for f in sh.incoming_allied_fleets:
+                time_to_fleet_kore[f.eta] += f.expected_kore()
+
+        shipyard_reinforcements = defaultdict(int)
+        for f in self.incoming_allied_fleets:
+            shipyard_reinforcements[f.eta] += f.ship_count
+
+        spawn_cost = board.spawn_cost
+        player_kore = player.kore
+        ship_count = self.ship_count
+        future_ship_count = [0] * self.time_to_build
+        future_ship_count.append(ship_count)
+        for t in range(1, board.size + 1 - self.time_to_build):
+            ship_count += shipyard_reinforcements[t]
+            player_kore += time_to_fleet_kore[t]
+ 
+            can_spawn = max_ships_to_spawn(t)
+            spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+            player_kore -= spawn_count * spawn_cost
+            ship_count += spawn_count
+            future_ship_count.append(ship_count)
+
+        return future_ship_count
+
+
 class Fleet(PositionObj):
     def __init__(
         self,
@@ -489,6 +564,7 @@ class FleetPointer:
         self.is_active = True
         self._paths = []
         self._points = self.points()
+        self._build_shipyard = None
 
     def points(self):
         for path in self.obj.route.paths:
@@ -500,10 +576,13 @@ class FleetPointer:
     def update(self):
         if not self.is_active:
             self.point = None
+            self._build_shipyard = None
             return
         try:
             self.point = next(self._points)
         except StopIteration:
+            if self._paths[-1][0].command == Convert.command:
+                self._build_shipyard = self.point
             self.point = None
             self.is_active = False
 
@@ -511,6 +590,9 @@ class FleetPointer:
         plan = PlanRoute([PlanPath(d, n) for d, n in self._paths])
         return BoardRoute(self.obj.point, plan)
 
+    @property
+    def build_shipyard(self):
+        return self._build_shipyard
 
 class Player(Obj):
     def __init__(self, *args, kore: float, board: "Board", **kwargs):
@@ -561,6 +643,10 @@ class Player(Obj):
     @cached_property
     def shipyards(self) -> List[Shipyard]:
         return self._get_objects("shipyards")
+
+    @cached_property
+    def future_shipyards(self) -> List[FutureShipyard]:
+        return self._get_objects("future_shipyards")
 
     @cached_property
     def ship_count(self) -> int:
@@ -713,6 +799,7 @@ class Board:
         self._players = []
         self._fleets = []
         self._shipyards = []
+        self._future_shipyards = []
         for player_id, player_data in enumerate(obs["players"]):
             player_kore, player_shipyards, player_fleets = player_data
             player = Player(game_id=player_id, kore=player_kore, board=self)
@@ -722,11 +809,17 @@ class Board:
                 point_id, kore, ship_count, direction, flight_plan = fleet_data
                 position = id_to_point[point_id]
                 direction = GAME_ID_TO_ACTION[direction]
-                if ship_count < self.shipyard_cost and Convert.command in flight_plan:
-                    # can't convert
-                    flight_plan = "".join(
-                        [x for x in flight_plan if x != Convert.command]
-                    )
+                build_shipyard = False
+                if Convert.command in flight_plan:
+                    if ship_count < self.shipyard_cost:
+                        # can't convert
+                        flight_plan = "".join(
+                            [x for x in flight_plan if x != Convert.command]
+                        )
+                    else:
+                        # Delete everything after the convert command
+                        flight_plan = flight_plan[:flight_plan.index(Convert.command) + 1]
+                        build_shipyard = True
                 plan = PlanRoute.from_str(flight_plan, direction)
                 route = BoardRoute(position, plan)
                 fleet = Fleet(
@@ -740,6 +833,18 @@ class Board:
                     board=self,
                 )
                 self._fleets.append(fleet)
+
+                if build_shipyard:
+                    future_shipyard = FutureShipyard(
+                        game_id=fleet_id,
+                        point=route.end,
+                        player_id=player_id,
+                        time_to_build=len(route) + 1,
+                        fleet_power=ship_count,
+                        board=self,
+                    )
+                    self._future_shipyards.append(future_shipyard)
+                    logger.error(f"Appended future {future_shipyard}")
 
             for shipyard_id, shipyard_data in player_shipyards.items():
                 point_id, ship_count, turns_controlled = shipyard_data
@@ -812,6 +917,10 @@ class Board:
     def shipyards(self) -> List[Shipyard]:
         return self._shipyards
 
+    @property
+    def future_shipyards(self) -> List[FutureShipyard]:
+        return self._future_shipyards
+
     @cached_property
     def total_kore(self) -> int:
         return sum(x.kore for x in self)
@@ -834,6 +943,7 @@ class Board:
         """
 
         shipyard_positions = {x.point for x in self.shipyards}
+        future_shipyard_positions = set()
 
         fleets = [FleetPointer(f) for f in self.fleets]
 
@@ -841,9 +951,17 @@ class Board:
             for f in fleets:
                 f.update()
 
+            # fleet shipyard conversions
+            for f in fleets:
+                if f.build_shipyard:
+                    future_shipyard_positions.add(f.build_shipyard)
+                    logger.error(f"Appended future {f.build_shipyard}")
+
             # fleet to shipyard
             for f in fleets:
                 if f.point in shipyard_positions:
+                    f.is_active = False
+                if f.point in future_shipyard_positions:
                     f.is_active = False
 
             # allied fleets

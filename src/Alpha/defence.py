@@ -68,10 +68,14 @@ def defend_shipyards(agent: Player):
                     board, other_sy.point, sy.point, agent, other_sy.ship_count
                 )
                 if routes:
-                    logger.info(f"Send reinforcements {other_sy.point}->{sy.point}")
+                    logger.info(f"Send reinforcements {other_sy.point}->{sy.point}. Size: {other_sy.available_ship_count}")
                     other_sy.action = Launch(
                         other_sy.available_ship_count, random.choice(routes)
                     )
+                else:
+                    logger.error(f"No routes to send reinforcements {other_sy.point}->{sy.point}")
             elif distance < incoming_hostile_time - 1:
                 logger.info(f"Saving reinforcements for {other_sy.point}->{sy.point}")
                 other_sy.set_guard_ship_count(other_sy.ship_count)
+            else:
+                logger.info(f"Not in time to save shipyard {other_sy.point}->{sy.point}")
