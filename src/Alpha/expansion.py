@@ -66,26 +66,14 @@ def find_best_position_for_shipyards(player: Player):
         # Dont form 3 shipyards in a line.
         # We can't send reinforcements in this case because
         # find_shortcut_routes chooses only routes along the line.
-        if len(player.shipyards) == 2 and \
-            (all(sy.point.x == p.x for sy in player.shipyards) or all(sy.point.y == p.y for sy in player.shipyards)):
+        if len(player.all_shipyards) == 2 and \
+            (all(sy.point.x == p.x for sy in player.all_shipyards) or all(sy.point.y == p.y for sy in player.all_shipyards)):
             continue
 
         (closest_friendly_sy,
          closest_enemy_sy,
          min_friendly_distance,
-         min_enemy_distance) = find_closest_shipyards(player, p)
-
-        (_,
-         closest_future_enemy_sy,
-         min_future_friendly_distance,
-         min_future_enemy_distance) = find_closest_shipyards(player, p, board.future_shipyards)
-
-        # Don't use points near where we're expanding now
-        if min_friendly_distance > min_future_friendly_distance:
-            continue
-
-        closest_enemy_sy = closest_enemy_sy if min_enemy_distance < min_future_enemy_distance else closest_future_enemy_sy
-        min_enemy_distance = min(min_enemy_distance, min_future_enemy_distance)
+         min_enemy_distance) = find_closest_shipyards(player, p, board.all_shipyards)
 
         closest_sy = closest_friendly_sy if min_friendly_distance < min_enemy_distance else closest_enemy_sy
         min_distance = min(min_friendly_distance, min_enemy_distance)
@@ -105,7 +93,7 @@ def find_best_position_for_shipyards(player: Player):
             (x.kore ** 1.1) * gaussian(p.distance_from(x), kore_mu, kore_sigma) / gaussian_mid
             for x in p.nearby_points(10)
         )
-        nearby_shipyards = sum(1 for x in board.shipyards if x.distance_from(p) < 5)
+        nearby_shipyards = sum(1 for x in board.all_shipyards if x.distance_from(p) < 5)
         shipyard_penalty = 100 * nearby_shipyards
         distance_penalty = 100 * min_distance
         enemy_penalty = 0 if min_enemy_distance >= 9 else \
@@ -141,7 +129,7 @@ def need_more_shipyards(player: Player) -> int:
         return 0
 
     fleet_distance = []
-    for sy in player.shipyards:
+    for sy in player.all_shipyards:
         for f in sy.incoming_allied_fleets:
             fleet_distance.append(len(f.route))
 
@@ -170,7 +158,7 @@ def need_more_shipyards(player: Player) -> int:
     current_shipyard_count = len(player.shipyards)
 
     op_shipyard_positions = {
-        x.point for x in board.shipyards if x.player_id != player.game_id
+        x.point for x in board.all_shipyards if x.player_id != player.game_id
     }
     expected_shipyard_count = current_shipyard_count + sum(
         1
@@ -178,7 +166,7 @@ def need_more_shipyards(player: Player) -> int:
         if x.route.last_action() == Convert or x.route.end in op_shipyard_positions
     )
 
-    opponent_shipyard_count = max(len(x.shipyards) for x in player.opponents)
+    opponent_shipyard_count = max(len(x.all_shipyards) for x in player.opponents)
     opponent_ship_count = max(x.ship_count for x in player.opponents)
     if (
         expected_shipyard_count > opponent_shipyard_count

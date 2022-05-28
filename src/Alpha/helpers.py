@@ -25,11 +25,16 @@ def is_intercept_route(
 
     if not allow_shipyard_intercept:
         shipyard_points = {x.point for x in board.shipyards}
+        future_sy_point_to_times = {x.point: x.time_to_build for x in board.future_shipyards}
     else:
         shipyard_points = {}
+        future_sy_point_to_times = {}
 
     for time, point in enumerate(route.points()[:-1]):
         if point in shipyard_points:
+            return True
+        if point in future_sy_point_to_times and \
+            future_sy_point_to_times[point] <= time:
             return True
 
         for pl in board.players:
@@ -137,10 +142,14 @@ def is_safety_route_to_convert(route_points: List[Point], player: Player):
                     return False
 
     shipyard_positions = {x.point for x in board.shipyards}
+    future_sy_point_to_times = {x.point: x.time_to_build for x in board.future_shipyards}
 
     for time, point in enumerate(route_points):
         for pl in board.players:
             if point in shipyard_positions:
+                return False
+            if point in future_sy_point_to_times and \
+                future_sy_point_to_times[point] <= time:
                 return False
 
             is_enemy = pl != player

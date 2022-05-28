@@ -48,7 +48,7 @@ def mine(agent: Player):
         mean_fleet_size = np.percentile(op_ship_count, 75)
         max_fleet_size = int(max(op_ship_count) * 1.1)
 
-    shipyard_count = len(agent.shipyards)
+    shipyard_count = len(agent.all_shipyards)
     if shipyard_count < 10:
         max_distance = 15
     elif shipyard_count < 20:

@@ -121,7 +121,7 @@ class Expansion(State):
 
     def act(self, agent: Player):
         board = agent.board
-        shipyard_positions = {x.point for x in board.shipyards}
+        shipyard_positions = {x.point for x in board.all_shipyards}
         new_shipyard_to_target = {}
         for sy, target in self.shipyard_to_target.items():
             found_sy = False

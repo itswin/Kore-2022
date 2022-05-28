@@ -366,7 +366,7 @@ class Shipyard(PositionObj):
         board = self.board
 
         time_to_fleet_kore = defaultdict(int)
-        for sh in player.shipyards:
+        for sh in player.all_shipyards:
             for f in sh.incoming_allied_fleets:
                 time_to_fleet_kore[f.eta] += f.expected_kore()
 
@@ -461,7 +461,7 @@ class FutureShipyard(PositionObj):
         board = self.board
 
         time_to_fleet_kore = defaultdict(int)
-        for sh in player.shipyards:
+        for sh in player.all_shipyards:
             for f in sh.incoming_allied_fleets:
                 time_to_fleet_kore[f.eta] += f.expected_kore()
 
@@ -651,6 +651,10 @@ class Player(Obj):
         return self._get_objects("future_shipyards")
 
     @cached_property
+    def all_shipyards(self):
+        return self._get_objects("all_shipyards")
+
+    @cached_property
     def ship_count(self) -> int:
         return sum(x.ship_count for x in itertools.chain(self.fleets, self.shipyards))
 
@@ -732,13 +736,8 @@ class Player(Obj):
 
         power = max(
             (sy.estimate_shipyard_power(time - sy.distance_from(point))
-            for sy in self.shipyards),
+            for sy in self.all_shipyards),
             default=0
-        )
-        power = max(
-            (sy.estimate_shipyard_power(time - sy.distance_from(point))
-            for sy in self.future_shipyards),
-            default=power
         )
 
         return power
@@ -934,6 +933,10 @@ class Board:
     def future_shipyards(self) -> List[FutureShipyard]:
         return self._future_shipyards
 
+    @property
+    def all_shipyards(self):
+        return itertools.chain(self._shipyards, self._future_shipyards)
+
     @cached_property
     def total_kore(self) -> int:
         return sum(x.kore for x in self)
@@ -956,7 +959,6 @@ class Board:
         """
 
         shipyard_positions = {x.point for x in self.shipyards}
-        future_shipyard_positions = set()
 
         fleets = [FleetPointer(f) for f in self.fleets]
 
@@ -964,16 +966,13 @@ class Board:
             for f in fleets:
                 f.update()
 
-            # fleet shipyard conversions
-            for f in fleets:
+                # fleet shipyard conversions
                 if f.build_shipyard:
-                    future_shipyard_positions.add(f.build_shipyard)
+                    shipyard_positions.add(f.build_shipyard)
 
             # fleet to shipyard
             for f in fleets:
                 if f.point in shipyard_positions:
-                    f.is_active = False
-                if f.point in future_shipyard_positions:
                     f.is_active = False
 
             # allied fleets

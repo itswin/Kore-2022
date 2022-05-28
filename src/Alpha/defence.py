@@ -70,8 +70,8 @@ def defend_shipyards(agent: Player):
             if distance < incoming_hostile_time - 1:
                 logger.info(f"Saving reinforcements for {other_sy.point}->{sy.point}")
                 other_sy.set_guard_ship_count(other_sy.ship_count)
-            elif distance == incoming_hostile_time - 1 or len(agent.shipyards) < 5:
-                if len(agent.shipyards) < 5:
+            elif distance == incoming_hostile_time - 1 or len(agent.all_shipyards) < 5:
+                if len(agent.all_shipyards) < 5:
                     logger.info(f"Not many shipyards. Save shipyard at all costs")
                 routes = find_shortcut_routes(
                     board, other_sy.point, sy.point, agent, other_sy.ship_count

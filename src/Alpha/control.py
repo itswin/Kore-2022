@@ -27,7 +27,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
 
     targets = []
     for x in agent.opponents:
-        for sy in x.shipyards:
+        for sy in x.all_shipyards:
             for fleet in sy.incoming_allied_fleets:
                 if fleet.expected_value() > 0.5:
                     targets.append(fleet)
@@ -48,7 +48,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
         (closest_friendly_sy, _, _, _) = find_closest_shipyards(agent, p)
         point_to_closest_shipyard[p] = closest_friendly_sy.point
 
-    opponent_shipyard_points = {x.point for x in board.shipyards if x.player_id != agent.game_id}
+    opponent_shipyard_points = {x.point for x in board.all_shipyards if x.player_id != agent.game_id}
     adjacent_attacks = []
     for t in targets:
         min_ships_to_send = int(t.ship_count + 1)
@@ -243,6 +243,8 @@ def _find_adjacent_targets(agent: Player, max_distance: int = 5):
 
         for f in fleets:
             f.update()
+            if f.build_shipyard:
+                shipyards_points.add(f.build_shipyard)
 
         point_to_fleet = {
             x.point: x.obj
@@ -315,7 +317,7 @@ def greedy_spawn(agent: Player):
             continue
 
         if not can_greedy_spawn and \
-            shipyard.ship_count > agent.ship_count * 0.2 / len(agent.shipyards):
+            shipyard.ship_count > agent.ship_count * 0.2 / len(agent.all_shipyards):
             continue
 
         num_ships_to_spawn = shipyard.max_ships_to_spawn

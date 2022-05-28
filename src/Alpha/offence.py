@@ -38,7 +38,7 @@ class _ShipyardTarget:
     def estimate_shipyard_power(self, time):
         help_power = 0
         player_id = self.shipyard.player_id
-        for sy in self.shipyard.board.shipyards:
+        for sy in self.shipyard.board.all_shipyards:
             if sy.player_id != player_id or sy == self.shipyard:
                 continue
             help_time = self.point.distance_from(sy.point)
@@ -81,15 +81,11 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
         return
 
     targets = []
-    def add_targets(shipyards):
-        for op_sy in shipyards:
-            if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
-                continue
-            target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
-            targets.append(target)
-
-    add_targets(board.shipyards)
-    add_targets(board.future_shipyards)
+    for op_sy in board.all_shipyards:
+        if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
+            continue
+        target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
+        targets.append(target)
 
     if not targets:
         return
@@ -128,7 +124,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
                     logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
 
-            num_ships_to_launch = min(sy.available_ship_count, int(power * 1.2))
+            num_ships_to_launch = min(sy.available_ship_count, int(power * 1.2) + 1)
 
             routes = find_shortcut_routes(
                 board,
@@ -159,15 +155,11 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
         return
 
     targets = []
-    def add_targets(shipyards):
-        for op_sy in shipyards:
-            if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
-                continue
-            target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
-            targets.append(target)
-
-    add_targets(board.shipyards)
-    add_targets(board.future_shipyards)
+    for op_sy in board.all_shipyards:
+        if op_sy.player_id == agent.game_id or op_sy.incoming_hostile_fleets:
+            continue
+        target = _ShipyardTarget(op_sy, sum(op_sy.distance_from(sy.point) for sy in agent_shipyards))
+        targets.append(target)
 
     if not targets:
         return
