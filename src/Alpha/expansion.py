@@ -77,6 +77,7 @@ def find_best_position_for_shipyards(player: Player):
 
         closest_sy = closest_friendly_sy if min_friendly_distance < min_enemy_distance else closest_enemy_sy
         min_distance = min(min_friendly_distance, min_enemy_distance)
+        dist_diff = min_enemy_distance - min_friendly_distance
 
         if (
             not closest_sy
@@ -96,8 +97,8 @@ def find_best_position_for_shipyards(player: Player):
         nearby_shipyards = sum(1 for x in board.all_shipyards if x.distance_from(p) < 5)
         shipyard_penalty = 100 * nearby_shipyards
         distance_penalty = 100 * min_distance
-        enemy_penalty = 0 if min_enemy_distance >= 9 else \
-            3 * player.estimate_board_risk(p, min_friendly_distance + 3) * (9 - min_enemy_distance)
+        enemy_penalty = 0 if dist_diff >= 9 else \
+            3 * player.estimate_board_risk(p, min_friendly_distance + 3 + min_enemy_distance // 2) * (9 - dist_diff)
 
         score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
         shipyard_to_scores[closest_sy].append({

@@ -58,6 +58,25 @@ def defend_shipyards(agent: Player):
 
         need_help_shipyards.append(sy)
 
+    for sy in agent.future_shipyards:
+        incoming_hostile_fleets = sy.incoming_hostile_fleets
+        incoming_allied_fleets = sy.incoming_allied_fleets
+
+        if not incoming_hostile_fleets:
+            continue
+
+        incoming_hostile_power = sum(x.ship_count for x in incoming_hostile_fleets)
+        incoming_hostile_time = min(x.eta for x in incoming_hostile_fleets)
+        incoming_allied_power = sum(
+            x.ship_count
+            for x in incoming_allied_fleets
+            if x.eta < incoming_hostile_time
+        )
+
+        ships_needed = incoming_hostile_power - incoming_allied_power
+        if ships_needed > 0:
+            need_help_shipyards.append(sy)
+
     for sy in need_help_shipyards:
         incoming_hostile_fleets = sy.incoming_hostile_fleets
         incoming_hostile_time = min(x.eta for x in incoming_hostile_fleets)
