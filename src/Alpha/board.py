@@ -858,7 +858,6 @@ class Board:
                         board=self,
                     )
                     self._future_shipyards.append(future_shipyard)
-                    logger.error(f"Appended future {future_shipyard}")
 
             for shipyard_id, shipyard_data in player_shipyards.items():
                 point_id, ship_count, turns_controlled = shipyard_data
@@ -969,7 +968,6 @@ class Board:
             for f in fleets:
                 if f.build_shipyard:
                     future_shipyard_positions.add(f.build_shipyard)
-                    logger.error(f"Appended future {f.build_shipyard}")
 
             # fleet to shipyard
             for f in fleets:

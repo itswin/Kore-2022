@@ -63,6 +63,12 @@ def find_best_position_for_shipyards(player: Player):
     for p in board:
         if p.kore > 100 or p.kore > board.total_kore * 0.01:
             continue
+        # Dont form 3 shipyards in a line.
+        # We can't send reinforcements in this case because
+        # find_shortcut_routes chooses only routes along the line.
+        if len(player.shipyards) == 2 and \
+            (all(sy.point.x == p.x for sy in player.shipyards) or all(sy.point.y == p.y for sy in player.shipyards)):
+            continue
 
         (closest_friendly_sy,
          closest_enemy_sy,
