@@ -124,7 +124,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
                     logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
 
-            num_ships_to_launch = min(sy.available_ship_count, int(power * 1.2) + 1)
+            num_ships_to_launch = min(sy.available_ship_count, max(int(power * 1.2), 21))
 
             routes = find_shortcut_routes(
                 board,
@@ -140,6 +140,8 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
                 )
                 sy.action = Launch(num_ships_to_launch, best_route)
                 break
+            else:
+                logger.info(f"No routes for {sy.point}->{t.point}")
 
 
 # Incoporate waiting also?

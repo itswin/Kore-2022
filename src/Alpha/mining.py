@@ -1,4 +1,5 @@
 import random
+import itertools
 import numpy as np
 import os
 from typing import List
@@ -8,20 +9,20 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from geometry import PlanRoute
-    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute
+    from geometry import PlanRoute, Point
+    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board
     from helpers import is_intercept_route, find_closest_shipyards
     from logger import logger
 else:
-    from .geometry import PlanRoute
-    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute
+    from .geometry import PlanRoute, Point
+    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board
     from .helpers import is_intercept_route, find_closest_shipyards
     from .logger import logger
 
 # <--->
 
 
-def mine(agent: Player):
+def mine(agent: Player, remaining_time: float):
     board = agent.board
     if not agent.opponents:
         return
@@ -41,13 +42,6 @@ def mine(agent: Player):
         for fleet in op.fleets:
             op_ship_count.append(fleet.ship_count)
 
-    if not op_ship_count:
-        mean_fleet_size = 0
-        max_fleet_size = np.inf
-    else:
-        mean_fleet_size = np.percentile(op_ship_count, 75)
-        max_fleet_size = int(max(op_ship_count) * 1.1)
-
     shipyard_count = len(agent.all_shipyards)
     if shipyard_count < 10:
         max_distance = 15
@@ -58,6 +52,8 @@ def mine(agent: Player):
 
     max_distance = min(int(board.steps_left // 2), max_distance)
     can_deplete_kore_fast = agent.shipyard_production_capacity * board.spawn_cost * 5 > agent.kore
+    # use_second_points = len(agent.all_shipyards) < 10 and remaining_time > 30
+    use_second_points = False
 
     for sy in agent.shipyards:
         if sy.action:
@@ -69,7 +65,7 @@ def mine(agent: Player):
             continue
 
         routes = find_shipyard_mining_routes(
-            sy, safety=safety, max_distance=max_distance
+            sy, safety=safety, max_distance=max_distance, use_second_points=use_second_points
         )
 
         route_to_info = {}
@@ -108,13 +104,14 @@ def mine(agent: Player):
 
 
 def find_shipyard_mining_routes(
-    sy: Shipyard, safety=True, max_distance: int = 15
+    sy: Shipyard, safety=True, max_distance: int = 15, use_second_points: int = False
 ) -> List[BoardRoute]:
     if max_distance < 1:
         return []
 
     departure = sy.point
     player = sy.player
+    board = player.board
 
     def get_destinations(shipyards):
         destinations = set()
@@ -132,30 +129,80 @@ def find_shipyard_mining_routes(
         return []
 
     routes = []
-    for c in sy.point.nearby_points(max_distance):
-        if c == departure or c in destinations:
-            continue
-
-        dest_sy = min(destinations, key=lambda x: c.distance_from(x.point))
-        future_dest_sys = list(filter(
-            lambda x: x.time_to_build <= x.distance_from(c) + sy.distance_from(c),
-            future_destinations
-        ))
-
-        if future_dest_sys:
-            future_dest_sy = min(future_dest_sys, key=lambda x: c.distance_from(x.point))
-            dest_sy = min([dest_sy, future_dest_sy], key=lambda x: c.distance_from(x.point))
-
-        destination = dest_sy.point
-        plans = departure.get_plans_through([c, destination])
-
-        for plan in plans:
-            wait_time = sy.calc_time_for_ships(plan.min_fleet_size())
-            route = MiningRoute(departure, plan, wait_time)
-
-            if is_intercept_route(route, player, safety):
+    if use_second_points:
+        for c in sy.point.nearby_points(max_distance):
+            if c == departure or any(c == x.point for x in destinations):
                 continue
 
-            routes.append(MiningRoute(departure, plan, wait_time))
+            adjs = c.nine_adjacent_points
+            for adj in adjs:
+                if adj == departure or any(adj == x.point for x in destinations):
+                    continue
+                cs = [c] if adj == c else [c, adj]
+
+                dist_through_cs = sum(c.distance_from(d) for c, d in zip(cs, cs[1:])) + sy.distance_from(cs[0])
+                dest_sy = min(destinations, key=lambda x: cs[-1].distance_from(x.point))
+                future_dest_sys = list(filter(
+                    lambda x: x.time_to_build <= dist_through_cs + x.distance_from(cs[-1]),
+                    future_destinations
+                ))
+
+                if future_dest_sys:
+                    future_dest_sy = min(future_dest_sys, key=lambda x: x.distance_from(cs[-1]))
+                    if future_dest_sy.point != c and future_dest_sy.point != adj:
+                        dest_sy = min([dest_sy, future_dest_sy], key=lambda x: x.distance_from(cs[-1]))
+
+                destination = dest_sy.point
+                points = [departure] + cs + [destination]
+                best_plan = get_greedy_mining_plan_through(points, board)
+                wait_time = sy.calc_time_for_ships(best_plan.min_fleet_size())
+                route = MiningRoute(departure, best_plan, wait_time)
+
+                if is_intercept_route(route, player, safety):
+                    continue
+
+                routes.append(route)
+    else:
+        for c in sy.point.nearby_points(max_distance):
+            if c == departure or any(c == x.point for x in destinations):
+                continue
+
+            dest_sy = min(destinations, key=lambda x: c.distance_from(x.point))
+            future_dest_sys = list(filter(
+                lambda x: x.time_to_build <= x.distance_from(c) + sy.distance_from(c),
+                future_destinations
+            ))
+
+            if future_dest_sys:
+                future_dest_sy = min(future_dest_sys, key=lambda x: c.distance_from(x.point))
+                dest_sy = min([dest_sy, future_dest_sy], key=lambda x: c.distance_from(x.point))
+
+            destination = dest_sy.point
+            plans = departure.get_plans_through([c, destination])
+
+            for plan in plans:
+                wait_time = sy.calc_time_for_ships(plan.min_fleet_size())
+                route = MiningRoute(departure, plan, wait_time)
+
+                if is_intercept_route(route, player, safety):
+                    continue
+
+                routes.append(MiningRoute(departure, plan, wait_time))
 
     return routes
+
+
+def get_greedy_mining_plan_through(points: List["Point"], board: Board) -> PlanRoute:
+    last = points[0]
+    plan = PlanRoute([])
+    for p in points[1:]:
+        plans = last.dirs_to(p)
+        paths = [PlanRoute(plan) for plan in plans]
+        best_route = max(
+            (BoardRoute(last, path, plan.num_steps) for path in paths),
+            key=lambda x: x.expected_kore(board, 20)
+        )
+        plan += best_route.plan
+        last = p
+
+    return plan

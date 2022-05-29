@@ -153,6 +153,20 @@ class Point(Obj):
 
         raise ValueError("Radius must be more or equal then 1")
 
+    @cached_property
+    def nine_adjacent_points(self) -> List["Point"]:
+        return [
+            self,
+            self.apply(North),
+            self.apply(East),
+            self.apply(South),
+            self.apply(West),
+            self.apply(North).apply(East),
+            self.apply(South).apply(East),
+            self.apply(South).apply(West),
+            self.apply(North).apply(West),
+        ]
+
     @cached_call
     def dirs_to_h(self, point: "Point") -> List["PlanPath"]:
         dx, dy = self._field.swap(self._x - point.x, self._y - point.y)

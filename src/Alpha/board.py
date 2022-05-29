@@ -157,7 +157,7 @@ class BoardPath:
 
 
 class BoardRoute:
-    def __init__(self, start: "Point", plan: "PlanRoute"):
+    def __init__(self, start: "Point", plan: "PlanRoute", start_time: int = 0):
         paths = []
         for p in plan.paths:
             path = BoardPath(start, p)
@@ -168,6 +168,7 @@ class BoardRoute:
         self._paths = paths
         self._start = paths[0].start
         self._end = paths[-1].end
+        self._start_time = start_time
 
     def __repr__(self):
         points = []
@@ -208,6 +209,10 @@ class BoardRoute:
     def end(self) -> "Point":
         return self._end
 
+    @property
+    def start_time(self) -> int:
+        return self._start_time
+
     def command_length(self) -> int:
         return len(self.command())
 
@@ -222,7 +227,7 @@ class BoardRoute:
         point_to_time = {}
         point_to_kore = {}
         for t, p in enumerate(self):
-            point_to_time[p] = t
+            point_to_time[p] = t + self._start_time
             point_to_kore[p] = p.kore
 
         for f in board.fleets:
@@ -473,9 +478,12 @@ class FutureShipyard(PositionObj):
         spawn_cost = board.spawn_cost
         player_kore = player.kore
         ship_count = self.ship_count
-        future_ship_count = [0] * self.time_to_build
-        future_ship_count.append(ship_count)
-        for t in range(1, board.size + 1 - self.time_to_build):
+        future_ship_count = [0]
+        for t in range(1, board.size + 1):
+            if t < self.time_to_build:
+                future_ship_count.append(0)
+                continue
+
             ship_count += shipyard_reinforcements[t]
             player_kore += time_to_fleet_kore[t]
  

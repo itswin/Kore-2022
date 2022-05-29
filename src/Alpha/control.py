@@ -351,6 +351,11 @@ def spawn(agent: Player):
                 return
 
 
+def conservative_save_kore(agent: Player):
+    if agent.ship_count > 1.1 * sum(x.ship_count for x in agent.opponents):
+        save_kore(agent)
+
+
 def save_kore(agent: Player):
     board = agent.board
 
