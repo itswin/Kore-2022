@@ -1,13 +1,15 @@
 import os
 import traceback
+from typing import Set
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
     from board import Board
+    from .geometry import Point
     from logger import logger, init_logger
-    from offence import capture_shipyards, coordinate_shipyard_capture
+    from offence import capture_shipyards, coordinate_shipyard_capture, whittle_attack
     from defence import defend_shipyards
     from expansion import expand
     from mining import mine
@@ -15,8 +17,9 @@ if IS_KAGGLE:
     from state import State
 else:
     from .board import Board
+    from .geometry import Point
     from .logger import logger, init_logger
-    from .offence import capture_shipyards, coordinate_shipyard_capture
+    from .offence import capture_shipyards, coordinate_shipyard_capture, whittle_attack
     from .defence import defend_shipyards
     from .expansion import expand
     from .mining import mine
@@ -24,7 +27,8 @@ else:
     from .state import State
 # <--->
 
-prev_state = State()
+prev_state: State = State()
+self_built_sys: Set[Point] = set()
 
 def agent(obs, conf):
     global prev_state
@@ -46,20 +50,26 @@ def agent(obs, conf):
         return {}
 
     try:
+        if step == 1:
+            for sy in a.shipyards:
+                self_built_sys.add(sy.point)
+
+        logger.info(f"Self built shipyards: {self_built_sys}")
         if prev_state.__repr__() != "State":
             logger.info(f"State: {prev_state}")
         a.state = prev_state
 
         conservative_save_kore(a)
-        defend_shipyards(a)
+        defend_shipyards(a, self_built_sys)
         save_kore(a)
-        capture_shipyards(a)
+        whittle_attack(a, step)
         coordinate_shipyard_capture(a)
+        capture_shipyards(a)
         adjacent_attack(a)
         direct_attack(a)
-        expand(a, step)
+        expand(a, step, self_built_sys)
         greedy_spawn(a)
-        mine(a, remaining_time)
+        mine(a, remaining_time, step)
         spawn(a)
 
         prev_state = a.state

@@ -15,6 +15,7 @@ if IS_KAGGLE:
         Obj,
         collection_rate_for_ship_count,
         max_ships_to_spawn,
+        cached_call,
         cached_property,
         create_spawn_ships_command,
         create_launch_fleet_command,
@@ -37,6 +38,7 @@ else:
         Obj,
         collection_rate_for_ship_count,
         max_ships_to_spawn,
+        cached_call,
         cached_property,
         create_spawn_ships_command,
         create_launch_fleet_command,
@@ -97,6 +99,17 @@ class DontLaunch(DoNothing):
 
     def to_str(self):
         raise NotImplementedError
+
+
+class AllowMine(DoNothing):
+    def __init__(self, max_distance: int = 10):
+        self.max_distance = max_distance
+
+    def __repr__(self):
+        return f"Allow mine {self.max_distance}"
+    
+    def to_str(self):
+        return NotImplementedError
 
 
 class BoardPath:
@@ -237,7 +250,7 @@ class BoardRoute:
 
         res = 0
         for p in self:
-            res += point_to_kore[p]
+            res += point_to_kore[p] * rate
             point_to_kore[p] *= (1 - rate)
         return res
 
@@ -309,9 +322,11 @@ class Shipyard(PositionObj):
         self._turns_controlled = turns_controlled
         self._guard_ship_count = 0
         self._future_ship_count = None
+        self._future_ship_count_before_action = None
         self.action: Optional[_ShipyardAction] = None
         self._blocked_dirs_at_time = None
         self._reserved_ship_count = 0
+        self._idle_turns = None
 
     @property
     def turns_controlled(self):
@@ -359,12 +374,21 @@ class Shipyard(PositionObj):
 
     def estimate_shipyard_power(self, time):
         if self._future_ship_count is None:
-            self._future_ship_count = self._estimate_future_ship_count()
+            self._future_ship_count, self._future_ship_count_before_action = self._estimate_future_ship_count()
         if time < 0:
             return 0
         if len(self._future_ship_count) <= time:
             return self._future_ship_count[-1]
         return self._future_ship_count[time] - self._guard_ship_count
+
+    def estimate_shipyard_power_before_action(self, time):
+        if self._future_ship_count_before_action is None:
+            self._future_ship_count, self._future_ship_count_before_action = self._estimate_future_ship_count()
+        if time < 0:
+            return 0
+        if len(self._future_ship_count_before_action) <= time:
+            return self._future_ship_count_before_action[-1]
+        return self._future_ship_count_before_action[time] - self._guard_ship_count
 
     def _estimate_future_ship_count(self):
         player = self.player
@@ -383,21 +407,23 @@ class Shipyard(PositionObj):
         player_kore = player.kore
         ship_count = self.ship_count
         future_ship_count = [ship_count]
+        future_ship_count_before_action = [ship_count]
         for t in range(1, board.size + 1):
             ship_count += shipyard_reinforcements[t]
             player_kore += time_to_fleet_kore[t]
  
+            future_ship_count_before_action.append(ship_count)
             can_spawn = max_ships_to_spawn(self.turns_controlled + t)
             spawn_count = min(int(player_kore // spawn_cost), can_spawn)
             player_kore -= spawn_count * spawn_cost
             ship_count += spawn_count
             future_ship_count.append(ship_count)
 
-        return future_ship_count
+        return future_ship_count, future_ship_count_before_action
 
     def calc_time_for_ships(self, num_ships: int) -> int:
         for t in range(self.board.size + 1):
-            if self.estimate_shipyard_power(t) >= num_ships:
+            if self.estimate_shipyard_power_before_action(t) >= num_ships:
                 return t
         return 10000
 
@@ -415,6 +441,46 @@ class Shipyard(PositionObj):
         for f in self.incoming_allied_fleets:
             blocked_dirs_at_time[f.eta - 1].append(get_opposite_action(f.route.last_action()))
         return blocked_dirs_at_time
+
+    def get_idle_turns_before(self, turn: int) -> int:
+        if self._idle_turns is None:
+            self._idle_turns = self._get_idle_turns()
+        if turn < 0:
+            return 0
+        if turn >= len(self._idle_turns):
+            return self._idle_turns[-1]
+        return self._idle_turns[turn]
+
+    # Assumes an idle turn if it can't spawn and it didn't just get a fleet
+    def _get_idle_turns(self) -> List[int]:
+        player = self.player
+        board = self.board
+
+        time_to_fleet_kore = defaultdict(int)
+        for sh in player.all_shipyards:
+            for f in sh.incoming_allied_fleets:
+                time_to_fleet_kore[f.eta] += f.expected_kore()
+
+        shipyard_reinforcements = defaultdict(int)
+        for f in self.incoming_allied_fleets:
+            shipyard_reinforcements[f.eta] += f.ship_count
+
+        idle_count = 0
+        spawn_cost = board.spawn_cost
+        player_kore = player.kore
+        idle_turns = [idle_count]
+        for t in range(1, 2 * board.size + 1):
+            player_kore += time_to_fleet_kore[t]
+
+            can_spawn = max_ships_to_spawn(self.turns_controlled + t)
+            spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+            if shipyard_reinforcements[t] == 0 and spawn_count == 0:
+                idle_count += 1
+            
+            player_kore -= spawn_count * spawn_cost
+            idle_turns.append(idle_count)
+
+        return idle_turns
 
 
 class FutureShipyard(PositionObj):

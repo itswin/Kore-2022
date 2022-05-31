@@ -278,13 +278,13 @@ def _need_more_ships(agent: Player, ship_count: int):
         return False
     if board.steps_left < 50 and is_inevitable_victory(agent):
         return False
-    if board.steps_left < 100 and agent.ship_count > 1.5 * sum(x.ship_count for x in agent.opponents):
+    if board.steps_left < 100 and agent.ship_count > 3 * sum(x.ship_count for x in agent.opponents):
         return False
     return True
 
 
 def _max_ships_to_control(agent: Player):
-    return max(100, 3 * sum(x.ship_count for x in agent.opponents))
+    return max(100, 5 * sum(x.ship_count for x in agent.opponents))
 
 
 def should_greedy_spawn(agent: Player, kore_ship_mult: float = 1.2):
