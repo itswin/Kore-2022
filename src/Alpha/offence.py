@@ -1,3 +1,4 @@
+from collections import defaultdict
 from math import floor
 import numpy as np
 import os
@@ -7,14 +8,14 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from basic import max_ships_to_spawn
-    from board import Player, Shipyard, Launch, DontLaunch
+    from board import Player, Shipyard, Launch, DontLaunch, FutureShipyard
     from geometry import Point
     from helpers import find_shortcut_routes
     from logger import logger
     from state import CoordinatedAttack
 else:
     from .basic import max_ships_to_spawn
-    from .board import Player, Shipyard, Launch, DontLaunch
+    from .board import Player, Shipyard, Launch, DontLaunch, FutureShipyard
     from .geometry import Point
     from .helpers import find_shortcut_routes
     from .logger import logger
@@ -37,14 +38,50 @@ class _ShipyardTarget:
 
     def estimate_shipyard_power(self, time):
         help_power = 0
+        board = self.shipyard.board
         player_id = self.shipyard.player_id
-        for sy in self.shipyard.board.all_shipyards:
-            if sy.player_id != player_id or sy == self.shipyard:
-                continue
-            help_time = self.point.distance_from(sy.point)
-            help_power += sy.estimate_shipyard_power(time - help_time - 1)
+        player = board.get_player(player_id)
 
-        own_power = self.shipyard.estimate_shipyard_power(time)
+        time_to_fleet_kore = defaultdict(int)
+        shipyard_reinforcements = defaultdict(lambda: defaultdict(int))
+        for sy in player.all_shipyards:
+            for f in sy.incoming_allied_fleets:
+                time_to_fleet_kore[f.eta] += f.expected_kore()
+                shipyard_reinforcements[sy][f.eta] += f.ship_count
+
+        spawn_cost = board.spawn_cost
+        player_kore = player.kore
+        own_power = self.shipyard.ship_count
+        help_power = 0
+        for t in range(0, time):
+            # Prioritize spawning at the target
+            player_kore += time_to_fleet_kore[t]
+            own_power += shipyard_reinforcements[self.shipyard][t]
+            can_spawn = max_ships_to_spawn(self.shipyard.turns_controlled + t)
+            spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+            player_kore -= spawn_count * spawn_cost
+            own_power += spawn_count
+
+            for sy in player.all_shipyards:
+                if sy == self.shipyard:
+                    continue
+                if isinstance(sy, FutureShipyard) and sy.time_to_build < t:
+                    continue
+
+                help_time = sy.distance_from(self.shipyard)
+                if time - t < help_time:
+                    continue
+                if t == 0 or (isinstance(sy, FutureShipyard) and sy.time_to_build == t):
+                    help_power += sy.ship_count
+
+                can_spawn = max_ships_to_spawn(sy.turns_controlled + t)
+                spawn_count = min(int(player_kore // spawn_cost), can_spawn)
+                player_kore -= spawn_count * spawn_cost
+                help_power += shipyard_reinforcements[sy][t]
+                if time - t != help_time:
+                    help_power += spawn_count
+
+        # logger.error(f"{self.shipyard.point}, Time: {time} Own power: {own_power}, Help power: {help_power}")
         return own_power + help_power
 
     def _get_total_incoming_power(self):
@@ -122,7 +159,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
             power = t.estimate_shipyard_power(distance)
 
             if sy.available_ship_count <= power:
-                if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
+                if sy.estimate_shipyard_power_before_action(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
                     sy.action = DontLaunch()
                     logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
@@ -139,7 +176,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
             if routes:
                 best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
                 logger.info(
-                    f"Attack shipyard {sy.point}->{t.point}"
+                    f"Attack shipyard {sy.point}->{t.point} {num_ships_to_launch} > {power}"
                 )
                 sy.action = Launch(num_ships_to_launch, best_route)
                 break
@@ -200,7 +237,7 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
                 sy = shipyards[j]
                 wait_time = max_sy_dist - t.point.distance_from(sy.point)
                 if sy.can_launch_to_at_time(t.point, wait_time) and t.can_attack_from(sy.point):
-                    power = floor(sy.estimate_shipyard_power(wait_time) * send_fraction)
+                    power = floor(sy.estimate_shipyard_power_before_action(wait_time) * send_fraction)
                     routes = find_shortcut_routes(
                         board,
                         sy.point,

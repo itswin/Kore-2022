@@ -32,7 +32,7 @@ def init_logger(_logger):
     ch = _FileHandler(FILE)
     ch.setLevel(LEVEL)
     formatter = logging.Formatter(
-        "%(asctime)s - %(levelname)s - %(message)s", datefmt="%H-%M-%S"
+        "%(levelname)s - %(message)s", datefmt="%H-%M-%S"
     )
     ch.setFormatter(formatter)
     _logger.addHandler(ch)

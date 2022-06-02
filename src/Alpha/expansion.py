@@ -40,7 +40,7 @@ def expand(player: Player, step: int, self_built_sys: Set[Shipyard], max_time_to
         if incoming_hostile_fleets:
             continue
 
-        if shipyard.estimate_shipyard_power(max_time_to_wait) < board.shipyard_cost:
+        if shipyard.estimate_shipyard_power_before_action(max_time_to_wait) < board.shipyard_cost:
             continue
         
         target = pose["point"]

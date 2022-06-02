@@ -82,7 +82,7 @@ def mine(agent: Player, remaining_time: float):
                 if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                     continue
 
-            score = route.expected_kore(board, num_ships_to_launch) / len(route)
+            score = route.expected_kore_mining(board, num_ships_to_launch) / len(route)
             route_to_info[route] = (score, num_ships_to_launch, board_risk)
 
         if not route_to_info:
@@ -158,7 +158,7 @@ def find_shipyard_mining_routes(
                 destination = dest_sy.point
                 points = [departure] + cs + [destination]
                 best_plan = get_greedy_mining_plan_through(points, board)
-                wait_time = sy.calc_time_for_ships(best_plan.min_fleet_size())
+                wait_time = sy.calc_time_for_ships_for_action(best_plan.min_fleet_size())
                 route = MiningRoute(departure, best_plan, wait_time)
 
                 if is_intercept_route(route, player, safety):
@@ -184,7 +184,7 @@ def find_shipyard_mining_routes(
             plans = departure.get_plans_through([c, destination])
 
             for plan in plans:
-                wait_time = sy.calc_time_for_ships(plan.min_fleet_size())
+                wait_time = sy.calc_time_for_ships_for_action(plan.min_fleet_size())
                 route = MiningRoute(departure, plan, wait_time)
 
                 if is_intercept_route(route, player, safety):
