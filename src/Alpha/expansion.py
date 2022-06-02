@@ -20,19 +20,10 @@ else:
     from .state import Expansion
 
 # <--->
-first_expansion = None
-MIN_TIME_AFTER_FIRST_EXPANSION = 25
-
 def expand(player: Player, step: int, max_time_to_wait: int = 10):
-    global first_expansion
-    if first_expansion is None and len(player.shipyards) == 2:
-        first_expansion = step
-
     board = player.board
     num_shipyards_to_create = need_more_shipyards(player)
     if not num_shipyards_to_create:
-        return
-    if first_expansion is not None and step - first_expansion < MIN_TIME_AFTER_FIRST_EXPANSION:
         return
     logger.info("---- Need to build shipyard ----")
 
