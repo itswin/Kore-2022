@@ -1,19 +1,19 @@
 from enum import Enum
 import os
-from typing import Dict, Tuple, Set
+from typing import Dict, Tuple
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
     from basic import min_ship_count_for_flight_plan_len
-    from board import Shipyard, Player, Launch, BoardRoute, DontLaunch, Spawn, AllowMine
+    from board import Shipyard, Player, Launch, BoardRoute, DontLaunch, Spawn
     from geometry import Point, Convert, PlanRoute, PlanPath
     from helpers import find_shortcut_routes, is_safety_route_to_convert
     from logger import logger
 else:
     from .basic import min_ship_count_for_flight_plan_len
-    from .board import Shipyard, Player, Launch, BoardRoute, DontLaunch, Spawn, AllowMine
+    from .board import Shipyard, Player, Launch, BoardRoute, DontLaunch, Spawn
     from .geometry import Point, Convert, PlanRoute, PlanPath
     from .helpers import find_shortcut_routes, is_safety_route_to_convert
     from .logger import logger
@@ -112,11 +112,9 @@ class CoordinatedAttack(State):
 
 
 class Expansion(State):
-    def __init__(self, shipyard_to_target: Dict[Shipyard, Point], self_built_sys: Set[Shipyard], turn_started: int):
+    def __init__(self, shipyard_to_target: Dict[Shipyard, Point]):
         super().__init__()
         self.shipyard_to_target = shipyard_to_target
-        self.self_built_sys = self_built_sys
-        self.turn_started = turn_started
 
     def __repr__(self):
         return f"{self.__class__.__name__}({self.shipyard_to_target})"
@@ -145,12 +143,10 @@ class Expansion(State):
             if sy.available_ship_count < 63:
                 logger.info(f"Expansion: {sy.point} has {sy.available_ship_count} and is waiting to launch")
                 new_shipyard_to_target[sy] = target
-                self._spawn(agent, sy)
-                if not sy.action:
-                    min_eta = min((x.eta for x in sy.incoming_allied_fleets), default=0)
-                    sy.action = AllowMine(min_eta // 2)
-                continue 
-            target_distance = shipyard.distance_from(target) + 2 * (board.step - self.turn_started)
+                sy.action = DontLaunch()
+                continue
+
+            target_distance = shipyard.distance_from(target)
 
             routes = []
             for p in board:
@@ -186,9 +182,8 @@ class Expansion(State):
                 )
                 logger.info(f"Building new sy {sy.point}->{route.end}")
                 sy.action = Launch(sy.available_ship_count, route)
-                self.self_built_sys.add(target)
             else:
-                logger.info(f"No routes for {sy.point}->{target} with distance {target_distance}")
+                logger.info(f"No routes for {sy.point}->{target}")
                 sy.action = DontLaunch()
                 new_shipyard_to_target[sy] = target
 
@@ -200,11 +195,3 @@ class Expansion(State):
     def next_state(self):
         return State()
 
-    def _spawn(self, agent: Player, shipyard: Shipyard):
-        board = agent.board
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost),
-            shipyard.max_ships_to_spawn,
-        )
-        if num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)

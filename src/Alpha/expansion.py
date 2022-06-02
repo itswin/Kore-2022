@@ -1,7 +1,6 @@
 import random
-import math
 import os
-from typing import Set
+from typing import List
 from collections import defaultdict
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
@@ -9,13 +8,13 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import Convert
-    from board import Player, Shipyard
+    from board import Player
     from logger import logger
     from helpers import find_closest_shipyards, gaussian
     from state import Expansion
 else:
     from .geometry import Convert
-    from .board import Player, Shipyard
+    from .board import Player
     from .logger import logger
     from .helpers import find_closest_shipyards, gaussian
     from .state import Expansion
@@ -24,7 +23,7 @@ else:
 first_expansion = None
 MIN_TIME_AFTER_FIRST_EXPANSION = 25
 
-def expand(player: Player, step: int, self_built_sys: Set[Shipyard], max_time_to_wait: int = 10):
+def expand(player: Player, step: int, max_time_to_wait: int = 10):
     global first_expansion
     if first_expansion is None and len(player.shipyards) == 2:
         first_expansion = step
@@ -59,18 +58,12 @@ def expand(player: Player, step: int, self_built_sys: Set[Shipyard], max_time_to
 
     if shipyard_to_target:
         logger.info(f"Starting expansion: {shipyard_to_target}")
-        player.state = Expansion(shipyard_to_target, self_built_sys, step)
+        player.state = Expansion(shipyard_to_target)
         player.update_state()
 
 
 def find_best_position_for_shipyards(player: Player):
     board = player.board
-
-    max_distance = 6
-    my_shipyard_count = len(player.all_shipyards)
-    op_shipard_count = max(len(x.all_shipyards) for x in player.opponents)
-    if my_shipyard_count == 1 and op_shipard_count > 1:
-        max_distance = 8
 
     shipyard_to_scores = defaultdict(list)
     for p in board:
@@ -95,8 +88,8 @@ def find_best_position_for_shipyards(player: Player):
         if (
             not closest_sy
             or closest_sy.player_id != player.game_id
-            or min_distance < 4
-            or min_distance > max_distance
+            or min_distance < 3
+            or min_distance > 6
         ):
             continue
 
@@ -127,17 +120,15 @@ def find_best_position_for_shipyards(player: Player):
         if scores:
             shipyard_to_point[shipyard] = max(scores, key=lambda x: x["score"])
             # scores.sort(key=lambda x: x["score"], reverse=True)
-            # for i in range(0, min(3, len(scores))):
+            # for i in range(0, min(2, len(scores))):
             #     pose = scores[i]
-            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Shipyard penalty: {pose['shipyard_penalty']}, Distance penalty: {pose['distance_penalty']}, Enemy penalty: {pose['enemy_penalty']:.2f}")
+            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Shipyard penalty: {pose['shipyard_penalty']}, Distance penalty: {pose['distance_penalty']}, Enemy penalty: {pose['enemy_penalty']}")
 
     return shipyard_to_point
 
 
 def need_more_shipyards(player: Player) -> int:
     board = player.board
-    if len(player.future_shipyards) > 0:
-        return False
     if isinstance(player.state, Expansion):
         return True
 
@@ -165,11 +156,6 @@ def need_more_shipyards(player: Player) -> int:
         scale = 100
     else:
         scale = 1000
-
-    # my_ship_count = player.ship_count
-    # op_ship_count = max(x.ship_count for x in player.opponents)
-    # return len(player.all_shipyards) * 100 < player.ship_count and \
-    #     (player.kore > shipyard_production_capacity * scale * 5 or my_ship_count > op_ship_count + 25)
 
     logger.info(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
     needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance

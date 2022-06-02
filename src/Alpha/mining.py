@@ -1,6 +1,5 @@
 import random
 import itertools
-import math
 import numpy as np
 import os
 from typing import List
@@ -11,19 +10,19 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute, Point
-    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine
+    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board
     from helpers import is_intercept_route, find_closest_shipyards
     from logger import logger
 else:
     from .geometry import PlanRoute, Point
-    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine
+    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board
     from .helpers import is_intercept_route, find_closest_shipyards
     from .logger import logger
 
 # <--->
 
 
-def mine(agent: Player, remaining_time: float, step: int):
+def mine(agent: Player, remaining_time: float):
     board = agent.board
     if not agent.opponents:
         return
@@ -52,32 +51,13 @@ def mine(agent: Player, remaining_time: float, step: int):
         max_distance = 8
 
     max_distance = min(int(board.steps_left // 2), max_distance)
-    shipyard_production_capacity = agent.shipyard_production_capacity
-    num_turns_to_deplete_kore = agent.kore / (board.spawn_cost * shipyard_production_capacity) if shipyard_production_capacity > 0 else 500
-    can_deplete_kore_fast = num_turns_to_deplete_kore < 5
-    use_second_points = len(agent.all_shipyards) < 10 and remaining_time > 30
+    can_deplete_kore_fast = agent.shipyard_production_capacity * board.spawn_cost * 5 > agent.kore
+    # use_second_points = len(agent.all_shipyards) < 10 and remaining_time > 30
+    use_second_points = False
 
-    def score_route(route: BoardRoute, num_ships_to_launch: int) -> float:
-        # Don't do short routes if we need to spawn
-        if num_turns_to_deplete_kore > 1 and len(route) == 2:
-            return 0
-
-        exp_kore = route.expected_kore(board, num_ships_to_launch)
-        if my_ship_count < 50:
-            if exp_kore < 10:
-                return 0
-
-        dist_penalty = sy.get_idle_turns_before(len(route)) / 4.0 if can_deplete_kore_fast else 0
-        return exp_kore / len(route) - 0
-
-    logger.info(f"Can deplete kore fast: {can_deplete_kore_fast} in {num_turns_to_deplete_kore}")
     for sy in agent.shipyards:
-        sy_max_dist = max_distance
-
         if sy.action:
-            if not isinstance(sy.action, AllowMine):
-                continue
-            sy_max_dist = sy.action.max_distance
+            continue
 
         free_ships = sy.available_ship_count
 
@@ -85,76 +65,42 @@ def mine(agent: Player, remaining_time: float, step: int):
             continue
 
         routes = find_shipyard_mining_routes(
-            sy, safety=safety, max_distance=sy_max_dist, use_second_points=use_second_points
+            sy, safety=safety, max_distance=max_distance, use_second_points=use_second_points
         )
 
         route_to_info = {}
         for route in routes:
             route_points = route.points()
 
-            board_risk = max(agent.estimate_board_risk(p, t + 1 + route.time_to_mine) for t, p in enumerate(route_points))
+            board_risk = max(agent.estimate_board_risk(p, t + 1) for t, p in enumerate(route_points))
             num_ships_to_launch = route.plan.min_fleet_size() if can_deplete_kore_fast else free_ships
-            # Prevent sending huge long routes
-            if route.plan.min_fleet_size() > 21 and \
-                (num_ships_to_launch > 0.2 * agent.ship_count or \
-                 num_ships_to_launch > 0.5 * sy.estimate_shipyard_power(10)):
-                continue
             if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                 num_ships_to_launch = min(free_ships, board_risk + 1)
-                if step < 100 or not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
+                if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                     continue
 
-            score = score_route(route, num_ships_to_launch)
+            score = route.expected_kore(board, num_ships_to_launch) / len(route)
             route_to_info[route] = (score, num_ships_to_launch, board_risk)
 
-        route_to_info = {k:v for k,v in route_to_info.items() if v[0] >= 0}
-        sorted_routes = sorted(
-            route_to_info.items(),
-            key=lambda x: x[1], reverse=True
-        )
         if not route_to_info:
             continue
 
-        # l = min(10, len(sorted_routes))
-        # for i in range(0, l):
-        #     route = sorted_routes[i][0]
+        # items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
+        # for i in range(0, 5):
+        #     route = items[i][0]
         #     score, num_ships_to_launch, board_risk = route_to_info[route]
-        #     logger.info(f"Mining Route: {route.plan}, {len(route)}, {score}, {board_risk}")
+        #     logger.info(f"Mining Route: {route.plan}, {score}, {board_risk}")
 
-        best_route = choose_route(sy, free_ships, sorted_routes)
-        # best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
+        best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
         # for t, p in enumerate(best_route.points()):
         #     logger.info(f"{p} {t}, ")
         score, num_ships_to_launch, board_risk = route_to_info[best_route]
         if best_route.can_execute():
-            logger.info(f"Mining Route: {best_route.plan}, {score}, {board_risk}, {best_route.expected_kore(board, num_ships_to_launch)} {num_ships_to_launch}")
+            logger.info(f"Mining Route: {best_route.plan}, {score}, {board_risk}")
             sy.action = Launch(num_ships_to_launch, best_route)
         else:
             logger.info(f"Waiting for Route: {best_route.plan}, {score}, {board_risk}")
 
-
-# Choose a route out of the top 10.
-# If you can launch multiple of them, add their scores together.
-def choose_route(sy, num_ships, sorted_routes, max_routes: int = 10):
-    best_route = sorted_routes[0][0]
-    score, num_ships_to_launch, board_risk = sorted_routes[0][1]
-    if best_route.can_execute():
-        return best_route
-
-    max_size = min(num_ships, sy.estimate_shipyard_power_before_action(best_route.time_to_mine) - num_ships_to_launch)
-    temp_route = find_first_route_of_size(sorted_routes, max_size)
-    if temp_route is not None:
-        logger.info(f"Waiting for route {best_route.plan}, {score}, {board_risk} but can launch one before it with {max_size}")
-        return temp_route
-
-    return best_route
-
-
-def find_first_route_of_size(routes, size):
-    for route, (score, num_ships_to_launch, board_risk) in routes:
-        if num_ships_to_launch <= size:
-            return route
-    return None
 
 
 def find_shipyard_mining_routes(
@@ -182,7 +128,6 @@ def find_shipyard_mining_routes(
     if not destinations:
         return []
 
-    route_set = set()
     routes = []
     if use_second_points:
         for c in sy.point.nearby_points(max_distance):
@@ -213,14 +158,10 @@ def find_shipyard_mining_routes(
                 wait_time = sy.calc_time_for_ships(best_plan.min_fleet_size())
                 route = MiningRoute(departure, best_plan, wait_time)
 
-                if route.plan.to_str() in route_set:
-                    continue
-
                 if is_intercept_route(route, player, safety):
                     continue
 
                 routes.append(route)
-                route_set.add(route.plan.to_str())
     else:
         for c in sy.point.nearby_points(max_distance):
             if c == departure or any(c == x.point for x in destinations):
@@ -243,14 +184,10 @@ def find_shipyard_mining_routes(
                 wait_time = sy.calc_time_for_ships(plan.min_fleet_size())
                 route = MiningRoute(departure, plan, wait_time)
 
-                if route.plan.to_str() in route_set:
-                    continue
-
                 if is_intercept_route(route, player, safety):
                     continue
 
                 routes.append(MiningRoute(departure, plan, wait_time))
-                route_set.add(route.plan.to_str())
 
     return routes
 
