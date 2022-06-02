@@ -60,6 +60,7 @@ def find_shortcut_routes(
     safety: bool = True,
     allow_shipyard_intercept=False,
     route_distance=None,
+    max_route_distance=None,
     allow_join=False,
 ) -> List[BoardRoute]:
     if route_distance is None:
@@ -67,7 +68,10 @@ def find_shortcut_routes(
     routes = []
     for p in board:
         distance = start.distance_from(p) + p.distance_from(end)
-        if distance != route_distance:
+        if max_route_distance is None:
+            if distance != route_distance:
+                continue
+        elif distance > max_route_distance:
             continue
 
         plans = start.get_plans_through([p, end])

@@ -10,12 +10,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute, Point
-    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board
+    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine
     from helpers import is_intercept_route, find_closest_shipyards
     from logger import logger
 else:
     from .geometry import PlanRoute, Point
-    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board
+    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine
     from .helpers import is_intercept_route, find_closest_shipyards
     from .logger import logger
 
@@ -56,8 +56,11 @@ def mine(agent: Player, remaining_time: float):
     use_second_points = False
 
     for sy in agent.shipyards:
+        sy_max_dist = max_distance
         if sy.action:
-            continue
+            if not isinstance(sy.action, AllowMine):
+                continue
+            sy_max_dist = sy.action.max_distance
 
         free_ships = sy.available_ship_count
 
@@ -65,7 +68,7 @@ def mine(agent: Player, remaining_time: float):
             continue
 
         routes = find_shipyard_mining_routes(
-            sy, safety=safety, max_distance=max_distance, use_second_points=use_second_points
+            sy, safety=safety, max_distance=sy_max_dist, use_second_points=use_second_points
         )
 
         route_to_info = {}
@@ -86,7 +89,7 @@ def mine(agent: Player, remaining_time: float):
             continue
 
         # items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
-        # for i in range(0, 5):
+        # for i in range(0, 10):
         #     route = items[i][0]
         #     score, num_ships_to_launch, board_risk = route_to_info[route]
         #     logger.info(f"Mining Route: {route.plan}, {score}, {board_risk}")

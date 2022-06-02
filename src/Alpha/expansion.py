@@ -1,6 +1,6 @@
 import random
 import os
-from typing import List
+from typing import Set
 from collections import defaultdict
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
@@ -8,19 +8,19 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import Convert
-    from board import Player
+    from board import Player, Shipyard
     from logger import logger
     from helpers import find_closest_shipyards, gaussian
     from state import Expansion
 else:
     from .geometry import Convert
-    from .board import Player
+    from .board import Player, Shipyard
     from .logger import logger
     from .helpers import find_closest_shipyards, gaussian
     from .state import Expansion
 
 # <--->
-def expand(player: Player, step: int, max_time_to_wait: int = 10):
+def expand(player: Player, step: int, self_built_sys: Set[Shipyard], max_time_to_wait: int = 10):
     board = player.board
     num_shipyards_to_create = need_more_shipyards(player)
     if not num_shipyards_to_create:
@@ -49,7 +49,8 @@ def expand(player: Player, step: int, max_time_to_wait: int = 10):
 
     if shipyard_to_target:
         logger.info(f"Starting expansion: {shipyard_to_target}")
-        player.state = Expansion(shipyard_to_target)
+        extra_distance = player.state.extra_distance if isinstance(player.state, Expansion) else 0
+        player.state = Expansion(shipyard_to_target, self_built_sys, extra_distance)
         player.update_state()
 
 

@@ -99,6 +99,17 @@ class DontLaunch(DoNothing):
         raise NotImplementedError
 
 
+class AllowMine(DoNothing):
+    def __init__(self, max_distance: int = 15):
+        self.max_distance = max_distance
+
+    def __repr__(self):
+        return f"AllowMine {self.max_distance}"
+
+    def to_str(self):
+        return NotImplementedError
+
+
 class BoardPath:
     max_length = 32
 

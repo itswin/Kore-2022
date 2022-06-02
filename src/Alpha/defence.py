@@ -1,22 +1,23 @@
 import random
 import os
+from typing import Set
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from board import Spawn, Player, Launch, DontLaunch
+    from board import Spawn, Player, Launch, DontLaunch, Shipyard
     from helpers import find_shortcut_routes
     from logger import logger
 else:
-    from .board import Spawn, Player, Launch, DontLaunch
+    from .board import Spawn, Player, Launch, DontLaunch, Shipyard
     from .helpers import find_shortcut_routes
     from .logger import logger
 
 # <--->
 
 
-def defend_shipyards(agent: Player):
+def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
     board = agent.board
 
     need_help_shipyards = []
@@ -89,7 +90,8 @@ def defend_shipyards(agent: Player):
             if distance < incoming_hostile_time - 1:
                 logger.info(f"Saving reinforcements for {other_sy.point}->{sy.point}")
                 other_sy.set_guard_ship_count(other_sy.ship_count)
-            elif distance == incoming_hostile_time - 1 or len(agent.all_shipyards) < 5:
+            elif distance == incoming_hostile_time - 1 or \
+                (len(agent.all_shipyards) < 5 and sy.point in self_built_sys):
                 if len(agent.all_shipyards) < 5:
                     logger.info(f"Not many shipyards. Save shipyard at all costs")
                 routes = find_shortcut_routes(
