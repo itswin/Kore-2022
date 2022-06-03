@@ -390,19 +390,8 @@ class Shipyard(PositionObj):
                 fleets.append(f)
         return fleets
 
-    def estimate_shipyard_power(self, time):
-        return self.estimate_shipyard_power_before_action(time + 1)
-
-    def estimate_shipyard_power_before_action(self, time):
-        if self._future_ship_count_before_action is None:
-            self._future_ship_count_before_action = self._estimate_future_ship_count()
-        if time < 0:
-            return 0
-        if len(self._future_ship_count_before_action) <= time:
-            return self._future_ship_count_before_action[-1]
-        return self._future_ship_count_before_action[time] - self._guard_ship_count
-
-    def _estimate_future_ship_count(self):
+    @cached_property
+    def future_ship_count_before_action(self):
         player = self.player
         board = self.board
 
@@ -418,9 +407,9 @@ class Shipyard(PositionObj):
         spawn_cost = board.spawn_cost
         player_kore = player.kore
         ship_count = self.ship_count
-        future_ship_count_before_action = []
+        ship_counts = []
         for t in range(0, board.size + 1):
-            future_ship_count_before_action.append(ship_count)
+            ship_counts.append(ship_count)
 
             ship_count += shipyard_reinforcements[t]
             player_kore += time_to_fleet_kore[t]
@@ -430,7 +419,17 @@ class Shipyard(PositionObj):
             player_kore -= spawn_count * spawn_cost
             ship_count += spawn_count
 
-        return future_ship_count_before_action
+        return ship_counts
+
+    def estimate_shipyard_power(self, time):
+        return self.estimate_shipyard_power_before_action(time + 1)
+
+    def estimate_shipyard_power_before_action(self, time):
+        if time < 0:
+            return 0
+        if len(self.future_ship_count_before_action) <= time:
+            return self.future_ship_count_before_action[-1]
+        return self.future_ship_count_before_action[time] - self._guard_ship_count
 
     def calc_time_for_ships_for_action(self, num_ships: int) -> int:
         for t in range(self.board.size + 1):
@@ -493,19 +492,8 @@ class FutureShipyard(PositionObj):
                 fleets.append(f)
         return fleets
 
-    def estimate_shipyard_power(self, time):
-        return self.estimate_shipyard_power_before_action(time + 1)
-
-    def estimate_shipyard_power_before_action(self, time):
-        if self._future_ship_count_before_action is None:
-            self._future_ship_count_before_action = self._estimate_future_ship_count()
-        if time < 0:
-            return 0
-        if len(self._future_ship_count_before_action) <= time:
-            return self._future_ship_count_before_action[-1]
-        return self._future_ship_count_before_action[time]
-
-    def _estimate_future_ship_count(self):
+    @cached_property
+    def future_ship_count_before_action(self):
         player = self.player
         board = self.board
 
@@ -523,13 +511,13 @@ class FutureShipyard(PositionObj):
         spawn_cost = board.spawn_cost
         player_kore = player.kore
         ship_count = self.ship_count
-        future_ship_count_before_action = []
+        ship_counts = []
         for t in range(0, board.size + 1):
             if t < self.time_to_build:
-                future_ship_count_before_action.append(0)
+                ship_counts.append(0)
                 continue
 
-            future_ship_count_before_action.append(ship_count)
+            ship_counts.append(ship_count)
             ship_count += shipyard_reinforcements[t]
             player_kore += time_to_fleet_kore[t]
  
@@ -538,7 +526,17 @@ class FutureShipyard(PositionObj):
             player_kore -= spawn_count * spawn_cost
             ship_count += spawn_count
 
-        return future_ship_count_before_action
+        return ship_counts
+
+    def estimate_shipyard_power(self, time):
+        return self.estimate_shipyard_power_before_action(time + 1)
+
+    def estimate_shipyard_power_before_action(self, time):
+        if time < 0:
+            return 0
+        if len(self.future_ship_count_before_action) <= time:
+            return self.future_ship_count_before_action[-1]
+        return self.future_ship_count_before_action[time]
 
 
 class Fleet(PositionObj):
