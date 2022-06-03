@@ -110,9 +110,6 @@ class _ShipyardTarget:
 
 
 def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_wait: int = 10):
-    if isinstance(agent.state, CoordinatedAttack):
-        return
-
     board = agent.board
     agent_shipyards = [
         x for x in agent.shipyards if x.available_ship_count >= 3 and not x.action
