@@ -149,7 +149,9 @@ class Expansion(State):
                 new_shipyard_to_target[sy] = target
                 self._spawn(agent, sy)
                 if not sy.action:
-                    min_eta = min((x.eta for x in sy.incoming_allied_fleets), default=0)
+                    # Workaround to allow mining if no fleets out now.
+                    if min_eta == 0:
+                        min_eta = 30
                     sy.action = AllowMine(min_eta // 2)
                 continue 
 

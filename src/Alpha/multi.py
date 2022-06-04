@@ -9,7 +9,7 @@ if IS_KAGGLE:
     from board import Board
     from geometry import Point
     from logger import logger, init_logger
-    from offence import capture_shipyards, coordinate_shipyard_capture
+    from offence import capture_shipyards, coordinate_shipyard_capture, whittle_attack
     from defence import defend_shipyards
     from expansion import expand
     from mining import mine
@@ -19,7 +19,7 @@ else:
     from .board import Board
     from .geometry import Point
     from .logger import logger, init_logger
-    from .offence import capture_shipyards, coordinate_shipyard_capture
+    from .offence import capture_shipyards, coordinate_shipyard_capture, whittle_attack
     from .defence import defend_shipyards
     from .expansion import expand
     from .mining import mine
@@ -62,6 +62,7 @@ def make_agent():
             conservative_save_kore(a)
             defend_shipyards(a, self_built_sys)
             save_kore(a)
+            # whittle_attack(a, step)
             coordinate_shipyard_capture(a)
             capture_shipyards(a)
             adjacent_attack(a)
