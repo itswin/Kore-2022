@@ -343,7 +343,6 @@ class Shipyard(PositionObj):
         self._ship_count = ship_count
         self._turns_controlled = turns_controlled
         self._guard_ship_count = 0
-        self._future_ship_count_before_action = None
         self.action: Optional[_ShipyardAction] = None
         self._blocked_dirs_at_time = None
         self._reserved_ship_count = 0
@@ -393,7 +392,7 @@ class Shipyard(PositionObj):
         return fleets
 
     @cached_property
-    def future_ship_count_before_action(self):
+    def future_ship_count(self):
         player = self.player
         board = self.board
 
@@ -411,9 +410,8 @@ class Shipyard(PositionObj):
         ship_count = self.ship_count
         ship_counts = []
         for t in range(0, board.size + 1):
-            ship_counts.append(ship_count)
-
             ship_count += shipyard_reinforcements[t]
+            ship_counts.append(ship_count)
             player_kore += time_to_fleet_kore[t]
 
             can_spawn = max_ships_to_spawn(self.turns_controlled + t)
@@ -424,19 +422,16 @@ class Shipyard(PositionObj):
         return ship_counts
 
     def estimate_shipyard_power(self, time):
-        return self.estimate_shipyard_power_before_action(time + 1)
-
-    def estimate_shipyard_power_before_action(self, time):
         if time < 0:
             return 0
-        if len(self.future_ship_count_before_action) <= time:
-            return self.future_ship_count_before_action[-1]
-        return self.future_ship_count_before_action[time] - self._guard_ship_count
+        if len(self.future_ship_count) <= time:
+            return self.future_ship_count[-1]
+        return self.future_ship_count[time] - self._guard_ship_count
 
     @cached_call
     def calc_time_for_ships_for_action(self, num_ships: int) -> int:
         for t in range(self.board.size + 1):
-            if self.estimate_shipyard_power_before_action(t) >= num_ships:
+            if self.estimate_shipyard_power(t) >= num_ships:
                 return t
         return 10000
 
@@ -500,7 +495,6 @@ class FutureShipyard(PositionObj):
         super().__init__(*args, **kwargs)
         self._time_to_build = time_to_build
         self._fleet_power = fleet_power
-        self._future_ship_count_before_action = None
         self._ship_count = fleet_power - 50
 
     def __repr__(self):
@@ -535,7 +529,7 @@ class FutureShipyard(PositionObj):
         return fleets
 
     @cached_property
-    def future_ship_count_before_action(self):
+    def future_ship_count(self):
         player = self.player
         board = self.board
 
@@ -559,8 +553,8 @@ class FutureShipyard(PositionObj):
                 ship_counts.append(0)
                 continue
 
-            ship_counts.append(ship_count)
             ship_count += shipyard_reinforcements[t]
+            ship_counts.append(ship_count)
             player_kore += time_to_fleet_kore[t]
  
             can_spawn = max_ships_to_spawn(t + self.turns_controlled)
@@ -571,14 +565,11 @@ class FutureShipyard(PositionObj):
         return ship_counts
 
     def estimate_shipyard_power(self, time):
-        return self.estimate_shipyard_power_before_action(time + 1)
-
-    def estimate_shipyard_power_before_action(self, time):
         if time < 0:
             return 0
-        if len(self.future_ship_count_before_action) <= time:
-            return self.future_ship_count_before_action[-1]
-        return self.future_ship_count_before_action[time]
+        if len(self.future_ship_count) <= time:
+            return self.future_ship_count[-1]
+        return self.future_ship_count[time]
 
 
 class Fleet(PositionObj):
@@ -828,7 +819,7 @@ class Player(Obj):
             return 0
 
         power = max(
-            (sy.estimate_shipyard_power_before_action(time - sy.distance_from(point))
+            (sy.estimate_shipyard_power(time - sy.distance_from(point))
             for sy in self.all_shipyards),
             default=0
         )

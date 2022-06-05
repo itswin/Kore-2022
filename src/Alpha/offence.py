@@ -28,9 +28,6 @@ class _ShipyardTarget:
     def __init__(self, shipyard: Shipyard, dist_from_shipyards: int):
         self.shipyard = shipyard
         self.point = shipyard.point
-        self.expected_profit = self._estimate_profit()
-        self.reinforcement_distance = self._get_reinforcement_distance()
-        self.total_incoming_power = self._get_total_incoming_power()
         self.distance_from_shipyards = dist_from_shipyards
 
     def __repr__(self):
@@ -84,29 +81,10 @@ class _ShipyardTarget:
         # logger.error(f"{self.shipyard.point}, Time: {time} Own power: {own_power}, Help power: {help_power}")
         return own_power + help_power
 
-    def _get_total_incoming_power(self):
-        return sum(x.ship_count for x in self.shipyard.incoming_allied_fleets)
-
-    def _get_reinforcement_distance(self):
-        incoming_allied_fleets = self.shipyard.incoming_allied_fleets
-        if not incoming_allied_fleets:
-            return np.inf
-        return min(x.eta for x in incoming_allied_fleets)
-
-    def _estimate_profit(self):
-        board = self.shipyard.board
-        spawn_cost = board.spawn_cost
-        profit = sum(
-            2 * x.expected_kore() - x.ship_count * spawn_cost
-            for x in self.shipyard.incoming_allied_fleets
-        )
-        profit += spawn_cost * board.shipyard_cost
-        return profit
-
     def can_attack_from(self, point: Point) -> bool:
         if isinstance(self.shipyard, Shipyard):
             return True
-        return self.shipyard.time_to_build < self.point.distance_from(point)
+        return self.shipyard.time_to_build <= self.point.distance_from(point)
 
 
 def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_wait: int = 10):
@@ -156,7 +134,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
             power = t.estimate_shipyard_power(distance)
 
             if sy.available_ship_count <= power:
-                if sy.estimate_shipyard_power_before_action(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
+                if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
                     sy.action = DontLaunch()
                     logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
@@ -237,7 +215,7 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
                 sy = shipyards[j]
                 wait_time = max_sy_dist - t.point.distance_from(sy.point)
                 if sy.can_launch_to_at_time(t.point, wait_time) and t.can_attack_from(sy.point):
-                    power = floor(sy.estimate_shipyard_power_before_action(wait_time) * send_fraction)
+                    power = floor(sy.estimate_shipyard_power(wait_time) * send_fraction)
                     routes = find_shortcut_routes(
                         board,
                         sy.point,

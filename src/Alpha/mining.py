@@ -91,7 +91,14 @@ def mine(agent: Player, remaining_time: float):
             route_points = route.points()
 
             board_risk = max(agent.estimate_board_risk(p, t + 1 + route.time_to_mine) for t, p in enumerate(route_points))
-            num_ships_to_launch = route.plan.min_fleet_size() if can_deplete_kore_fast else free_ships
+            num_ships_to_launch = route.plan.min_fleet_size() \
+                if can_deplete_kore_fast and not len(route) == 2 \
+                else free_ships
+            # Prevent sending huge long routes
+            if route.plan.min_fleet_size() > 21 and \
+                (num_ships_to_launch > 0.2 * agent.ship_count or \
+                 num_ships_to_launch > 0.5 * sy.estimate_shipyard_power(10)):
+                continue
             if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                 num_ships_to_launch = min(free_ships, board_risk + 1)
                 if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
@@ -111,16 +118,16 @@ def mine(agent: Player, remaining_time: float):
 
         best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
         # for t, p in enumerate(best_route.points()):
-        #     logger.info(f"{p} {t}, ")
+        #     logger.info(f"{p} {t}, {agent.estimate_board_risk(p, t + 1 + best_route.time_to_mine)}")
         score, num_ships_to_launch, board_risk = route_to_info[best_route]
         if num_ships_to_launch < 10 and agent.kore >= 10:
             logger.info(f"{sy.point} should spawn not launch small fleet. {best_route.plan} {num_ships_to_launch}")
             continue
         if best_route.can_execute():
-            logger.info(f"{sy.point} Mining Route: {best_route.plan}, {score}, {board_risk}")
+            logger.info(f"{sy.point} Mining Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk}")
             sy.action = Launch(num_ships_to_launch, best_route)
         else:
-            logger.info(f"{sy.point} Waiting for Route: {best_route.plan}, {score}, {board_risk}")
+            logger.info(f"{sy.point} Waiting for Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk} in {best_route.time_to_mine}")
 
 
 
@@ -180,6 +187,9 @@ def find_shipyard_mining_routes(
                 wait_time = sy.calc_time_for_ships_for_action(best_plan.min_fleet_size())
                 route = MiningRoute(departure, best_plan, wait_time)
 
+                if len(route) > 2 * max_distance:
+                    continue
+
                 if route.plan.to_str() in route_set:
                     continue
 
@@ -209,6 +219,9 @@ def find_shipyard_mining_routes(
             for plan in plans:
                 wait_time = sy.calc_time_for_ships_for_action(plan.min_fleet_size())
                 route = MiningRoute(departure, plan, wait_time)
+
+                if len(route) > 2 * max_distance:
+                    continue
 
                 if route.plan.to_str() in route_set:
                     continue
