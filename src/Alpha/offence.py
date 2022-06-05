@@ -250,7 +250,7 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
 WHITTLE_COOLDOWN = 20
 last_whittle_attack = -WHITTLE_COOLDOWN
 
-def should_whittle_attack(agent: Player, step: int, min_overage: int = 25):
+def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
     board = agent.board
     global last_whittle_attack
     my_ship_count = agent.ship_count
