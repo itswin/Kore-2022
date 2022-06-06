@@ -32,6 +32,7 @@ self_built_sys: Set[Point] = set()
 
 def agent(obs, conf):
     global prev_state
+    global self_built_sys
     if obs["step"] == 0:
         init_logger(logger)
 

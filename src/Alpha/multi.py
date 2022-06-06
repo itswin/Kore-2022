@@ -80,4 +80,3 @@ def make_agent():
         return a.actions()
     return agent
 
-agent = make_agent()

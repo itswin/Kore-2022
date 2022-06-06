@@ -251,8 +251,8 @@ WHITTLE_COOLDOWN = 20
 last_whittle_attack = -WHITTLE_COOLDOWN
 
 def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
-    board = agent.board
     global last_whittle_attack
+    board = agent.board
     my_ship_count = agent.ship_count
     my_shipyard_count = len(agent.shipyards)
 
@@ -260,8 +260,7 @@ def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
         x.point for x in board.all_shipyards if x.player_id != agent.game_id
     }
     attacking_count = sum(
-        (x.ship_count for x in agent.fleets if x.route.end in op_shipyard_positions),
-        start=0
+        x.ship_count for x in agent.fleets if x.route.end in op_shipyard_positions
     )
 
     available_ships = my_ship_count - attacking_count
