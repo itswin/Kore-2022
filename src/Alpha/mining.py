@@ -120,7 +120,7 @@ def mine(agent: Player, remaining_time: float):
         # for t, p in enumerate(best_route.points()):
         #     logger.info(f"{p} {t}, {agent.estimate_board_risk(p, t + 1 + best_route.time_to_mine)}")
         score, num_ships_to_launch, board_risk = route_to_info[best_route]
-        if num_ships_to_launch < 10 and agent.kore >= 10:
+        if len(best_route) < 4 and agent.kore >= 10:
             logger.info(f"{sy.point} should spawn not launch small fleet. {best_route.plan} {num_ships_to_launch}")
             continue
         if best_route.can_execute():

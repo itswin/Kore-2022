@@ -179,7 +179,7 @@ class Expansion(State):
                     if any(x in shipyard_positions for x in route_points):
                         continue
 
-                    if not is_safety_route_to_convert(route_points, agent):
+                    if not is_safety_route_to_convert(route_points, agent, sy.available_ship_count):
                         continue
 
                     routes.append(route)

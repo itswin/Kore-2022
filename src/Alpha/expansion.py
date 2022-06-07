@@ -74,7 +74,7 @@ def find_best_position_for_shipyards(player: Player):
         if closest_friendly_sy is None:
             point_to_kore[p] = p.kore
         else:
-            point_to_kore[p] = p.kore * min((0.5 + 0.1 * min_friendly_distance, 1))
+            point_to_kore[p] = p.kore * min((0.1 + 0.1 * min_friendly_distance, 1))
 
     shipyard_to_scores = defaultdict(list)
     for p in board:
@@ -99,8 +99,8 @@ def find_best_position_for_shipyards(player: Player):
         if (
             not closest_sy
             or closest_sy.player_id != player.game_id
-            or min_distance < 3
-            or min_distance > 6
+            or min_distance < 4
+            or min_distance > 8
         ):
             continue
 
@@ -110,7 +110,7 @@ def find_best_position_for_shipyards(player: Player):
         )
         nearby_shipyards = sum(1 for x in board.all_shipyards if x.distance_from(p) < 5)
         shipyard_penalty = 100 * nearby_shipyards
-        distance_penalty = 100 * min_distance
+        distance_penalty = 50 * min_distance
         enemy_penalty = 0 if dist_diff >= 9 else \
             3 * player.estimate_board_risk(p, min_friendly_distance + 3 + min_enemy_distance // 2) * (9 - dist_diff)
 
@@ -120,16 +120,27 @@ def find_best_position_for_shipyards(player: Player):
         # enemy_penalty = max(3 * (risk - help // 2) * 16 / math.sqrt(dist_diff + 1), 0)
         # logger.error(f"{p}, {risk}, {help}, {enemy_penalty}")
 
-        # score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty - avg_dist_penalty
-        score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
+        score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty - avg_dist_penalty
+        # score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty
         shipyard_to_scores[closest_sy].append({
             "score": score,
             "point": p,
+            "nearby_kore": nearby_kore,
             "shipyard_penalty": shipyard_penalty,
             "distance_penalty": distance_penalty,
             "enemy_penalty": enemy_penalty,
             "avg_dist_penalty": avg_dist_penalty,
         })
+
+    max_kore_score = 0
+    for shipyard, scores in shipyard_to_scores.items():
+        max_kore_score = max(max_kore_score, max((x["nearby_kore"] for x in scores), default=0))
+
+    BASELINE_KORE_SCORE = 5000
+    for shipyard, scores in shipyard_to_scores.items():
+        for score in scores:
+            score["nearby_kore"] = score["nearby_kore"] * BASELINE_KORE_SCORE / max_kore_score
+            score["score"] = score["nearby_kore"] - score["shipyard_penalty"] - score["distance_penalty"] - score["enemy_penalty"] - score["avg_dist_penalty"]
 
     shipyard_to_point = {}
     for shipyard, scores in shipyard_to_scores.items():
@@ -138,7 +149,7 @@ def find_best_position_for_shipyards(player: Player):
             # scores.sort(key=lambda x: x["score"], reverse=True)
             # for i in range(0, min(5, len(scores))):
             #     pose = scores[i]
-            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Shipyard: {pose['shipyard_penalty']}, Distance: {pose['distance_penalty']}, Enemy: {pose['enemy_penalty']:.2f}, Avg dist: {pose['avg_dist_penalty']:.2f}")
+            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Nearby kore: {pose['nearby_kore']:.2f} Shipyard: {pose['shipyard_penalty']}, Distance: {pose['distance_penalty']}, Enemy: {pose['enemy_penalty']:.2f}, Avg dist: {pose['avg_dist_penalty']:.2f}")
 
     return shipyard_to_point
 

@@ -134,7 +134,7 @@ def find_closest_shipyards(player: Player, p: Point, shipyards=None) -> Tuple[Sh
     return closest_friendly_sy, closest_enemy_sy, min_friendly_distance, min_enemy_distance
 
 
-def is_safety_route_to_convert(route_points: List[Point], player: Player):
+def is_safety_route_to_convert(route_points: List[Point], player: Player, num_ships: int = -1):
     board = player.board
 
     target_point = route_points[-1]
@@ -159,7 +159,10 @@ def is_safety_route_to_convert(route_points: List[Point], player: Player):
             is_enemy = pl != player
 
             if point in pl.expected_fleets_positions[time]:
-                return False
+                if is_enemy:
+                    return False
+                if pl.expected_fleets_positions[time][point].ship_count > num_ships:
+                    return False
 
             if is_enemy:
                 if point in pl.expected_dmg_positions[time]:
