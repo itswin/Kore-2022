@@ -6,15 +6,15 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from basic import min_ship_count_for_flight_plan_len
-    from board import Shipyard, Player, Launch, BoardRoute, DontLaunch, Spawn, AllowMine
+    from board import Shipyard, Player, Launch, BoardRoute, Spawn, AllowMine
     from geometry import Point, Convert, PlanRoute, PlanPath
-    from helpers import find_shortcut_routes, is_safety_route_to_convert
+    from helpers import find_shortcut_routes, is_safety_route_to_convert, _spawn
     from logger import logger
 else:
     from .basic import min_ship_count_for_flight_plan_len
-    from .board import Shipyard, Player, Launch, BoardRoute, DontLaunch, Spawn, AllowMine
+    from .board import Shipyard, Player, Launch, BoardRoute, Spawn, AllowMine
     from .geometry import Point, Convert, PlanRoute, PlanPath
-    from .helpers import find_shortcut_routes, is_safety_route_to_convert
+    from .helpers import find_shortcut_routes, is_safety_route_to_convert, _spawn
     from .logger import logger
 
 
@@ -84,12 +84,12 @@ class CoordinatedAttack(State):
                     )
                     sy.action = Launch(num_ships_to_launch, best_route)
                 else:
+                    _spawn(agent, sy)
                     logger.info(f"CoordinatedAttack: No routes found for {sy.point}->{self.target}")
-                    self._spawn(agent, sy)
                     new_shipyard_to_launch[sy] = (power, wait_time - 1)
             else:
+                _spawn(agent, sy)
                 logger.info(f"CoordinatedAttack: Not time for {sy.point} to send ships {self.target}")
-                self._spawn(agent, sy)
                 new_shipyard_to_launch[sy] = (power, wait_time - 1)
 
         self.shipyard_to_launch = new_shipyard_to_launch
@@ -147,8 +147,8 @@ class Expansion(State):
             if sy.available_ship_count < 63:
                 logger.info(f"Expansion: {sy.point} has {sy.available_ship_count} and is waiting to launch")
                 new_shipyard_to_target[sy] = target
-                self._spawn(agent, sy)
-                if not sy.action:
+                _spawn(agent, sy)
+                if not isinstance(sy.action, Spawn):
                     # Workaround to allow mining if no fleets out now.
                     if min_eta == 0:
                         min_eta = 30
@@ -194,9 +194,7 @@ class Expansion(State):
                 self.self_built_sys.add(target)
             else:
                 logger.info(f"No routes for {sy.point}->{target} with distance {target_distance}")
-                self._spawn(agent, sy)
-                if not sy.action:
-                    sy.action = DontLaunch()
+                _spawn(agent, sy)
                 new_shipyard_to_target[sy] = target
                 self.extra_distance += 1
 

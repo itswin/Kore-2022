@@ -8,16 +8,16 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from basic import max_ships_to_spawn
-    from board import Player, Shipyard, Launch, DontLaunch, FutureShipyard
+    from board import Player, Shipyard, Launch, FutureShipyard
     from geometry import Point
-    from helpers import find_shortcut_routes
+    from helpers import find_shortcut_routes, _spawn
     from logger import logger
     from state import CoordinatedAttack
 else:
     from .basic import max_ships_to_spawn
-    from .board import Player, Shipyard, Launch, DontLaunch, FutureShipyard
+    from .board import Player, Shipyard, Launch, FutureShipyard
     from .geometry import Point
-    from .helpers import find_shortcut_routes
+    from .helpers import find_shortcut_routes, _spawn
     from .logger import logger
     from .state import CoordinatedAttack
 
@@ -135,7 +135,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
 
             if sy.available_ship_count <= power:
                 if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
-                    sy.action = DontLaunch()
+                    _spawn(agent, sy)
                     logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
 
@@ -330,7 +330,7 @@ def whittle_attack(agent: Player, step: int,
 
             if sy.available_ship_count <= whittle_power:
                 if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
-                    sy.action = DontLaunch()
+                    _spawn(agent, sy)
                     logger.info(f"Saving for whittle attack {sy.point} -> {t.point}")
                 continue
 

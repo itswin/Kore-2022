@@ -1,20 +1,20 @@
 import random
 import math
 import os
-from typing import Set
+from typing import Dict, Set
 from collections import defaultdict
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from geometry import Convert
+    from geometry import Convert, Point
     from board import Player, Shipyard
     from logger import logger
     from helpers import find_closest_shipyards, gaussian, create_scorer
     from state import Expansion
 else:
-    from .geometry import Convert
+    from .geometry import Convert, Point
     from .board import Player, Shipyard
     from .logger import logger
     from .helpers import find_closest_shipyards, gaussian, create_scorer
@@ -33,19 +33,20 @@ def expand(player: Player, step: int, self_built_sys: Set[Shipyard], max_time_to
 
     shipyard_count = 0
     shipyard_to_target = {}
-    for shipyard, pose in poses:
-        if shipyard_count >= num_shipyards_to_create:
+    available_sys = set(sy for sy in player.shipyards if not sy.incoming_hostile_fleets)
+    for _, pose in poses:
+        if shipyard_count >= num_shipyards_to_create or not available_sys:
             break
 
-        incoming_hostile_fleets = shipyard.incoming_hostile_fleets
-        if incoming_hostile_fleets:
+        target = pose["point"]
+        best_sy = find_best_shipyard(available_sys, target)
+        if not best_sy:
+            break
+
+        if best_sy.estimate_shipyard_power(max_time_to_wait) < board.shipyard_cost:
             continue
 
-        if shipyard.estimate_shipyard_power(max_time_to_wait) < board.shipyard_cost:
-            continue
-        
-        target = pose["point"]
-        shipyard_to_target[shipyard] = target
+        shipyard_to_target[best_sy] = target
         shipyard_count += 1
 
     if shipyard_to_target:
@@ -55,7 +56,19 @@ def expand(player: Player, step: int, self_built_sys: Set[Shipyard], max_time_to
         player.update_state()
 
 
-def find_best_position_for_shipyards(player: Player):
+def find_best_shipyard(available_sys: Set[Shipyard], p: Point) -> Shipyard:
+    best_sy = None
+    best_time = 999999
+    for sy in available_sys:
+        time = sy.distance_from(p) + sy.calc_time_for_ships_for_action(63)
+        if time < best_time:
+            best_time = time
+            best_sy = sy
+    available_sys.remove(best_sy)
+    return best_sy
+
+
+def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
     board = player.board
 
     kore_sigma = 5
