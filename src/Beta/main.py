@@ -32,6 +32,7 @@ self_built_sys: Set[Point] = set()
 
 def agent(obs, conf):
     global prev_state
+    global self_built_sys
     if obs["step"] == 0:
         init_logger(logger)
 
@@ -60,7 +61,7 @@ def agent(obs, conf):
         conservative_save_kore(a)
         defend_shipyards(a, self_built_sys)
         save_kore(a)
-        # whittle_attack(a, step)
+        whittle_attack(a, step)
         coordinate_shipyard_capture(a)
         capture_shipyards(a)
         adjacent_attack(a)

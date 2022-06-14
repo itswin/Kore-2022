@@ -134,7 +134,7 @@ def find_closest_shipyards(player: Player, p: Point, shipyards=None) -> Tuple[Sh
     return closest_friendly_sy, closest_enemy_sy, min_friendly_distance, min_enemy_distance
 
 
-def is_safety_route_to_convert(route_points: List[Point], player: Player):
+def is_safety_route_to_convert(route_points: List[Point], player: Player, num_ships: int = -1):
     board = player.board
 
     target_point = route_points[-1]
@@ -159,7 +159,10 @@ def is_safety_route_to_convert(route_points: List[Point], player: Player):
             is_enemy = pl != player
 
             if point in pl.expected_fleets_positions[time]:
-                return False
+                if is_enemy:
+                    return False
+                if pl.expected_fleets_positions[time][point].ship_count > num_ships:
+                    return False
 
             if is_enemy:
                 if point in pl.expected_dmg_positions[time]:
@@ -168,5 +171,21 @@ def is_safety_route_to_convert(route_points: List[Point], player: Player):
     return True
 
 
-def gaussian(x, mu, sigma):
+def gaussian(x: float, mu: float, sigma: float):
     return 1 / (sigma * (2 * pi) ** 0.5) * exp(-0.5 * (x - mu) ** 2 / sigma ** 2)
+
+
+def create_scorer(sigma: float):
+    mid = gaussian(0, 0, sigma)
+    mid1 = gaussian(0, 0, 2 * sigma)
+    mid2 = gaussian(0, 0, 3 * sigma)
+    def g(p: Point, x: Point) -> float:
+        dx = abs(p.x - x.x)
+        dy = abs(p.y - x.y)
+        # if dx == 0 or dy == 0:
+        #     return gaussian(x.distance_from(p), 0, 3 * sigma) / mid2
+        # if dx == 1 or dy == 1:
+        #     return gaussian(x.distance_from(p), 0, 2 * sigma) / mid1
+        return gaussian(x.distance_from(p), 0, sigma) / mid
+    return g
+

@@ -62,7 +62,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
 
         shipyards.sort(key=lambda x: x.distance_from(t))
         for sy in shipyards:
-            if sy.action or sy.estimate_shipyard_power_before_action(max_time_to_wait) < min_ships_to_send:
+            if sy.action or sy.estimate_shipyard_power(max_time_to_wait) < min_ships_to_send:
                 continue
 
             num_ships_to_launch = sy.available_ship_count
@@ -78,7 +78,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                 if time_diff != 0 and time_diff != 1:
                     if time_diff > 0 and time_diff < max_time_to_wait and \
                         time_diff < best_candidate_time and \
-                        sy.estimate_shipyard_power_before_action(time_diff) >= min_ships_to_send:
+                        sy.estimate_shipyard_power(time_diff) >= min_ships_to_send:
                         best_candidate_sy = sy
                         best_candidate_time = time_diff
                         best_target_point = target_point

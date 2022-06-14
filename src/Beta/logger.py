@@ -1,7 +1,7 @@
 import os
 import logging
 
-FILE = "game_beta.log"
+FILE = "game.log"
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 LEVEL = logging.DEBUG if not IS_KAGGLE else logging.INFO
 LOGGING_ENABLED = True
@@ -41,4 +41,4 @@ def init_logger(_logger):
 if IS_KAGGLE:
     logger = logging.getLogger()
 else:
-    logger = logging.getLogger("Beta")
+    logger = logging.getLogger("Alpha")

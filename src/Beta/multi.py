@@ -62,7 +62,7 @@ def make_agent():
             conservative_save_kore(a)
             defend_shipyards(a, self_built_sys)
             save_kore(a)
-            # whittle_attack(a, step)
+            whittle_attack(a, step)
             coordinate_shipyard_capture(a)
             capture_shipyards(a)
             adjacent_attack(a)
@@ -80,4 +80,3 @@ def make_agent():
         return a.actions()
     return agent
 
-agent = make_agent()
