@@ -358,7 +358,7 @@ def whittle_attack(agent: Player, step: int,
     attacked = False
     for t in targets:
         shipyards = sorted(
-            agent_shipyards, key=lambda x: t.point.distance_from(x.point)
+            agent_shipyards, key=lambda x: t.point.distance_from(x.point) + x.calc_time_for_ships_for_action(50)
         )
 
         for sy in shipyards:
