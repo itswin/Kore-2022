@@ -77,7 +77,7 @@ def mine(agent: Player, remaining_time: float):
                 continue
             sy_max_dist = sy.action.max_distance
 
-        free_ships = sy.available_ship_count
+        free_ships = sy.available_ship_count if my_ship_count < 105 else min(sy.available_ship_count, my_ship_count // 5)
 
         if free_ships <= 2:
             continue
@@ -229,6 +229,9 @@ def find_shipyard_mining_routes(
 
                 if is_intercept_route(route, player, safety):
                     continue
+
+                # if wait_time > 2:
+                #     continue
 
                 routes.append(route)
                 route_set.add(route.plan.to_str())

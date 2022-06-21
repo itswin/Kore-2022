@@ -29,11 +29,15 @@ else:
 
 prev_state: State = State()
 self_built_sys: Set[Point] = set()
+lost_sys: Set[Point] = set()
+initialized = False
 
 def agent(obs, conf):
     global prev_state
     global self_built_sys
-    if obs["step"] == 0:
+    global lost_sys
+    global initialized
+    if not initialized:
         init_logger(logger)
 
     board = Board(obs, conf)
@@ -51,9 +55,16 @@ def agent(obs, conf):
         return {}
 
     try:
-        if step == 1:
+        if not initialized:
             for sy in a.shipyards:
                 self_built_sys.add(sy.point)
+        else:
+            for sy in a.shipyards:
+                if sy.point in lost_sys:
+                    lost_sys.remove(sy.point)
+            for sy in self_built_sys:
+                if sy not in lost_sys and not any(sy == x.point for x in a.all_shipyards):
+                    lost_sys.add(sy)
         if prev_state.__repr__() != "State":
             logger.info(f"State: {prev_state}")
         a.state = prev_state
@@ -64,9 +75,9 @@ def agent(obs, conf):
         whittle_attack(a, step)
         coordinate_shipyard_capture(a)
         capture_shipyards(a)
+        expand(a, step, self_built_sys, lost_sys)
         adjacent_attack(a)
         direct_attack(a)
-        expand(a, step, self_built_sys)
         greedy_spawn(a)
         mine(a, remaining_time)
         spawn(a)
@@ -75,5 +86,8 @@ def agent(obs, conf):
     except:
         logger.error(traceback.format_exc())
         exit()
+
+    if not initialized:
+        initialized = True
 
     return a.actions()

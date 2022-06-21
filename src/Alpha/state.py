@@ -34,6 +34,9 @@ class State:
     def next_state(self):
         raise NotImplementedError
 
+    def is_sy_used(self, _: Shipyard):
+        return False
+
 
 class CoordinatedAttack(State):
     def __init__(self, shipyard_to_launch: Dict[Shipyard, Tuple[int, int]], target: Point, max_timeout: int = 5):
@@ -78,7 +81,7 @@ class CoordinatedAttack(State):
                 )
 
                 if routes:
-                    best_route = min(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                    best_route = min(routes, key=lambda route: (route.expected_kore(board, num_ships_to_launch), len(route)))
                     logger.info(
                         f"Coordinated attack shipyard {num_ships_to_launch} {sy.point}->{self.target}"
                     )
@@ -108,6 +111,44 @@ class CoordinatedAttack(State):
         )
         if num_ships_to_spawn:
             shipyard.action = Spawn(num_ships_to_spawn)
+
+    def is_sy_used(self, sy: Shipyard):
+        for shipyard, _ in self.shipyard_to_launch.items():
+            if shipyard.game_id == sy.game_id:
+                return True
+        return False
+
+
+
+class PrepCoordinatedAttack(State):
+    def __init__(self, max_time_to_wait: int, target: Point = None):
+        super().__init__()
+        self.max_time_to_wait = max_time_to_wait
+        self.target = target
+        self._half_ships_ready = False
+    
+    def __repr__(self):
+        return f"{self.__class__.__name__}({self.max_time_to_wait})({self.target})"
+
+    def act(self, agent: Player):
+        self.max_time_to_wait -= 1
+        ship_count = agent.ship_count
+        ships_ready = 0
+
+        for sy in agent.shipyards:
+            _spawn(agent, sy)
+            ships_ready += sy.available_ship_count
+
+        self._half_ships_ready = ships_ready >= ship_count * 0.5
+
+    def is_finished(self):
+        return self.max_time_to_wait <= 0 or self._half_ships_ready
+
+    def next_state(self):
+        return State()
+
+    def is_sy_used(self, _: Shipyard):
+        return True
 
 
 class Expansion(State):
@@ -214,3 +255,9 @@ class Expansion(State):
         )
         if num_ships_to_spawn:
             shipyard.action = Spawn(num_ships_to_spawn)
+
+    def is_sy_used(self, sy: Shipyard):
+        for shipyard, _ in self.shipyard_to_target.items():
+            if shipyard.game_id == sy.game_id:
+                return True
+        return False
