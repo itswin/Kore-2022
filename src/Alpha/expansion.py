@@ -38,15 +38,15 @@ def expand(
     shipyard_to_target = {}
     available_sys = set(sy for sy in player.shipyards if not sy.incoming_hostile_fleets)
 
-    lost_sy = {sy: sum(sy.distance_from(sy.point) for sy in player.shipyards) for sy in lost_sys}
-    lost_sy = sorted(lost_sy, key=lost_sy.get)
-    if lost_sy:
-        target = lost_sy[0]
-        logger.info(f"Starting expansion to lost shipyard {target}")
-        extra_distance = player.state.extra_distance if isinstance(player.state, Expansion) else 0
-        player.state = PrepCoordinatedAttack(10, target)
-        player.update_state()
-        return
+    # lost_sy = {sy: sum(sy.distance_from(sy.point) for sy in player.shipyards) for sy in lost_sys}
+    # lost_sy = sorted(lost_sy, key=lost_sy.get)
+    # if lost_sy:
+    #     target = lost_sy[0]
+    #     logger.info(f"Starting expansion to lost shipyard {target}")
+    #     extra_distance = player.state.extra_distance if isinstance(player.state, Expansion) else 0
+    #     player.state = PrepCoordinatedAttack(10, target)
+    #     player.update_state()
+    #     return
 
     for _, pose in poses:
         if shipyard_count >= num_shipyards_to_create or not available_sys:
@@ -154,7 +154,9 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         )
         nearby_shipyards = sum(1 for x in board.all_shipyards if x.distance_from(p) < 5)
         shipyard_penalty = 100 * nearby_shipyards
-        distance_penalty = 0
+        distance_penalty = 50 * min_distance
+        # enemy_penalty = 0 if dist_diff >= 9 else \
+        #     3 * player.estimate_board_risk(p, min_friendly_distance + 3 + min_enemy_distance // 2) * (9 - dist_diff)
 
         avg_dist_penalty = 10 * sum(x.distance_from(p) ** 1.5 for x in player.all_shipyards) / num_sys if num_sys else 0
         risk = player.estimate_board_risk(p, min_friendly_distance + min_enemy_distance + 3)
@@ -180,11 +182,11 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         max_enemy_penalty = max(max_enemy_penalty, max((x["enemy_penalty"] for x in scores), default=0))
 
     BASELINE_KORE_SCORE = 5000
-    BASELINE_ENEMY_PENALTY = 2500
+    # BASELINE_ENEMY_PENALTY = 2500
     for shipyard, scores in shipyard_to_scores.items():
         for score in scores:
             score["nearby_kore"] = score["nearby_kore"] * BASELINE_KORE_SCORE / max_kore_score
-            score["enemy_penalty"] = score["enemy_penalty"] * BASELINE_ENEMY_PENALTY / max_enemy_penalty
+            # score["enemy_penalty"] = score["enemy_penalty"] * BASELINE_ENEMY_PENALTY / max_enemy_penalty
             score["score"] = score["nearby_kore"] - score["shipyard_penalty"] - score["distance_penalty"] - score["enemy_penalty"] - score["avg_dist_penalty"]
 
     shipyard_to_point = {}
