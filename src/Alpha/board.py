@@ -440,6 +440,8 @@ class Shipyard(PositionObj):
             self._blocked_dirs_at_time = self._get_blocked_dirs_at_time()
         plans = self.point.get_plans_through([point])
         for p in plans:
+            if len(p.paths) == 0:
+                continue
             if p.paths[0] not in self._blocked_dirs_at_time[time]:
                 return True
         return False
