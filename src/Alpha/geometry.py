@@ -189,6 +189,8 @@ class Point(Obj):
         last = self
         mid_plans = []
         for p in points:
+            if p == last:
+                continue
             paths = last.dirs_to(p)
             mid_plans.append([PlanRoute(path) for path in paths])
             last = p
@@ -408,6 +410,8 @@ class PlanRoute:
         return PlanRoute(paths)
 
     def to_str(self) -> str:
+        if len(self.paths) == 0:
+            return ""
         s = ""
         for a in self.paths[:-1]:
             s += a.to_str()
