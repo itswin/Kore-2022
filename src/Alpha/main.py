@@ -30,12 +30,14 @@ else:
 prev_state: State = State()
 self_built_sys: Set[Point] = set()
 lost_sys: Set[Point] = set()
+first_expansion: int = None
 initialized = False
 
 def agent(obs, conf):
     global prev_state
     global self_built_sys
     global lost_sys
+    global first_expansion
     global initialized
     if not initialized:
         init_logger(logger)
@@ -75,7 +77,7 @@ def agent(obs, conf):
         coordinate_shipyard_capture(a)
         capture_shipyards(a)
         direct_attack_expansion(a)
-        expand(a, step, self_built_sys, lost_sys)
+        expand(a, step, self_built_sys, lost_sys, first_expansion)
         whittle_attack(a, step)
         adjacent_attack(a)
         direct_attack(a)

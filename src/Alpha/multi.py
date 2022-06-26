@@ -31,12 +31,14 @@ def make_agent():
     prev_state: State = State()
     self_built_sys: Set[Point] = set()
     lost_sys: Set[Point] = set()
+    first_expansion: int = None
     initialized = False
 
     def agent(obs, conf):
         nonlocal prev_state
         nonlocal self_built_sys
         nonlocal lost_sys
+        nonlocal first_expansion
         nonlocal initialized
         if not initialized:
             init_logger(logger)
@@ -76,7 +78,7 @@ def make_agent():
             coordinate_shipyard_capture(a)
             capture_shipyards(a)
             direct_attack_expansion(a)
-            expand(a, step, self_built_sys, lost_sys)
+            expand(a, step, self_built_sys, lost_sys, first_expansion)
             whittle_attack(a, step)
             adjacent_attack(a)
             direct_attack(a)
