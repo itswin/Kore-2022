@@ -100,6 +100,20 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         div = new_diff / old_diff
         return 1 + 2 * div / kore_sigma
 
+    def voronoi_bonus(point_to_closest_sy, x, p):
+        f_dist = point_to_closest_sy[x][2]
+        e_dist = point_to_closest_sy[x][3]
+        new_dist = x.distance_from(p)
+
+        # if f_dist >= e_dist and new_dist <= e_dist:
+        #     if p.x == 4 and p.y == 4:
+        #         logger.info(f"{point_to_closest_sy[x][1].point} {p} {x} {f_dist} {e_dist} {new_dist}")
+        #     return 10
+        # else:
+        #     return 0
+
+        return 10 if f_dist >= e_dist and new_dist <= e_dist else 0
+
     # Penalize kore based on how close it is to another shipyard
     point_to_kore = {}
     for p in board:
@@ -155,6 +169,10 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         nearby_shipyards = sum(1 for x in board.all_shipyards if x.distance_from(p) < 5)
         shipyard_penalty = 100 * nearby_shipyards
         distance_penalty = 50 * min_distance
+        # voronoi = sum(
+        #      voronoi_bonus(point_to_closest_sy, x, p) for x in p.nearby_points(10)
+        # )
+        voronoi = 0
         # enemy_penalty = 0 if dist_diff >= 9 else \
         #     3 * player.estimate_board_risk(p, min_friendly_distance + 3 + min_enemy_distance // 2) * (9 - dist_diff)
 
@@ -164,7 +182,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         enemy_penalty = max(3 * (risk - help // 2) * 16 / math.sqrt(dist_diff + 1), 0)
         # logger.error(f"{p}, {risk}, {help}, {enemy_penalty}")
 
-        score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty - avg_dist_penalty
+        score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty - avg_dist_penalty + voronoi
         shipyard_to_scores[closest_sy].append({
             "score": score,
             "point": p,
@@ -173,6 +191,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
             "distance_penalty": distance_penalty,
             "enemy_penalty": enemy_penalty,
             "avg_dist_penalty": avg_dist_penalty,
+            "voronoi": voronoi
         })
 
     max_kore_score = 1
@@ -187,16 +206,16 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         for score in scores:
             score["nearby_kore"] = score["nearby_kore"] * BASELINE_KORE_SCORE / max_kore_score
             # score["enemy_penalty"] = score["enemy_penalty"] * BASELINE_ENEMY_PENALTY / max_enemy_penalty
-            score["score"] = score["nearby_kore"] - score["shipyard_penalty"] - score["distance_penalty"] - score["enemy_penalty"] - score["avg_dist_penalty"]
+            score["score"] = score["nearby_kore"] - score["shipyard_penalty"] - score["distance_penalty"] - score["enemy_penalty"] - score["avg_dist_penalty"] + score["voronoi"]
 
     shipyard_to_point = {}
     for shipyard, scores in shipyard_to_scores.items():
         if scores:
             shipyard_to_point[shipyard] = max(scores, key=lambda x: x["score"])
             # scores.sort(key=lambda x: x["score"], reverse=True)
-            # for i in range(0, min(2, len(scores))):
+            # for i in range(0, min(10, len(scores))):
             #     pose = scores[i]
-            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Nearby kore: {pose['nearby_kore']:.2f} Shipyard: {pose['shipyard_penalty']}, Distance: {pose['distance_penalty']}, Enemy: {pose['enemy_penalty']:.2f}, Avg dist: {pose['avg_dist_penalty']:.2f}")
+            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Nearby kore: {pose['nearby_kore']:.2f} Shipyard: {pose['shipyard_penalty']}, Distance: {pose['distance_penalty']}, Enemy: {pose['enemy_penalty']:.2f}, Avg dist: {pose['avg_dist_penalty']:.2f} Voronoi {pose['voronoi']}")
 
     return shipyard_to_point
 
@@ -205,6 +224,8 @@ def need_more_shipyards(player: Player) -> int:
     board = player.board
     if isinstance(player.state, Expansion):
         return True
+    if player.state.__repr__() != "State":
+        return False
 
     if player.ship_count < 100:
         return 0

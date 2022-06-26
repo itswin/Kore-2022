@@ -31,7 +31,7 @@ class _ShipyardTarget:
         self.distance_from_shipyards = dist_from_shipyards
 
     def __repr__(self):
-        return f"Target {self.shipyard}"
+        return f"Target {self.shipyard.point} {self.distance_from_shipyards}"
 
     def estimate_shipyard_power(self, time):
         help_power = 0
@@ -280,7 +280,7 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
                 best_t = t
 
         if loaded_attack:
-            logger.info(f"Starting coordinated attack: {t.point}, {shipyard_to_launch.items()}")
+            logger.info(f"Starting coordinated attack: {t.point}, {[(x.point, y) for (x, y) in shipyard_to_launch.items()]}")
             agent.state = CoordinatedAttack(shipyard_to_launch, t.point)
             agent.update_state()
             break
