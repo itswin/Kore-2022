@@ -158,7 +158,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
             not closest_sy
             or closest_sy.player_id != player.game_id
             or min_distance < 4
-            or min_distance > 6
+            or min_distance > 8
         ):
             continue
 
@@ -281,17 +281,11 @@ def need_more_shipyards(player: Player) -> int:
     op_shipyard_positions = {
         x.point for x in board.all_shipyards if x.player_id != player.game_id
     }
-
-    op_sy_to_attack = defaultdict(int)
-    expected_shipyard_count = current_shipyard_count
-    for x in player.fleets:
-        if x.route.last_action() == Convert:
-            expected_shipyard_count += 1
-        if x.route.end in op_shipyard_positions:
-            op_sy_to_attack[x.route.end] += x.ship_count
-    for op_sy in player.opponents[0].all_shipyards:
-        if op_sy.point in op_sy_to_attack and op_sy_to_attack[sy] > sy.ship_count:
-            expected_shipyard_count += 1
+    expected_shipyard_count = current_shipyard_count + sum(
+        1
+        for x in player.fleets
+        if x.route.last_action() == Convert or x.route.end in op_shipyard_positions
+    )
 
     opponent_shipyard_count = max(len(x.all_shipyards) for x in player.opponents)
     opponent_ship_count = max(x.ship_count for x in player.opponents)
