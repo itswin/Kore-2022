@@ -41,4 +41,4 @@ def init_logger(_logger):
 if IS_KAGGLE:
     logger = logging.getLogger()
 else:
-    logger = logging.getLogger("Alpha")
+    logger = logging.getLogger("Beta")
