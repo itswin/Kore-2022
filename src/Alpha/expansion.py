@@ -21,18 +21,10 @@ else:
     from .state import Expansion, PrepCoordinatedAttack
 
 # <--->
-MIN_TIME_AFTER_FIRST_EXPANSION = 25
 def expand(
     player: Player, step: int, self_built_sys: Set[Shipyard], 
-    lost_sys: Set[Shipyard], first_expansion: int, max_time_to_wait: int = 10
+    lost_sys: Set[Shipyard], max_time_to_wait: int = 10
 ):
-    if first_expansion is None:
-        if len(player.all_shipyards) == 2:
-            first_expansion = step
-            return
-    elif step - first_expansion < MIN_TIME_AFTER_FIRST_EXPANSION:
-        return
-
     board = player.board
     num_shipyards_to_create = need_more_shipyards(player)
     if not num_shipyards_to_create:

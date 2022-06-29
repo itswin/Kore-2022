@@ -9,14 +9,14 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from basic import max_ships_to_spawn
     from board import Player, Shipyard, Launch, FutureShipyard
-    from geometry import Point, Convert
+    from geometry import Point
     from helpers import find_shortcut_routes, _spawn
     from logger import logger
     from state import CoordinatedAttack, PrepCoordinatedAttack, State
 else:
     from .basic import max_ships_to_spawn
     from .board import Player, Shipyard, Launch, FutureShipyard
-    from .geometry import Point, Convert
+    from .geometry import Point
     from .helpers import find_shortcut_routes, _spawn
     from .logger import logger
     from .state import CoordinatedAttack, PrepCoordinatedAttack, State
@@ -306,11 +306,8 @@ def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
     attacking_count = sum(
         x.ship_count for x in agent.fleets if x.route.end in op_shipyard_positions
     )
-    expanding_count = sum(
-        50 for x in agent.fleets if x.route.last_action() == Convert
-    )
 
-    available_ships = my_ship_count - attacking_count - expanding_count
+    available_ships = my_ship_count - attacking_count
     op_ship_count = max(x.ship_count for x in agent.opponents)
     op_shipyard_count = max(len(x.shipyards) for x in agent.opponents)
 
@@ -322,7 +319,7 @@ def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
 
 
 def whittle_attack(agent: Player, step: int,
-    max_attack_distance: int = 20, max_time_to_wait: int = 2, whittle_power: int = 50
+    max_attack_distance: int = 20, max_time_to_wait: int = 3, whittle_power: int = 50
 ):
     global last_whittle_attack
     if isinstance(agent.state, CoordinatedAttack):
