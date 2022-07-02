@@ -77,7 +77,7 @@ def mine(agent: Player, remaining_time: float):
                 continue
             sy_max_dist = sy.action.max_distance
 
-        free_ships = sy.available_ship_count
+        free_ships = sy.available_ship_count if my_ship_count < 105 else min(sy.available_ship_count, my_ship_count // 5)
 
         if free_ships <= 2:
             continue
@@ -90,12 +90,13 @@ def mine(agent: Player, remaining_time: float):
         for route in routes:
             route_points = route.points()
 
+            min_fleet_size = route.plan.min_fleet_size()
             board_risk = max(agent.estimate_board_risk(p, t + 1 + route.time_to_mine) for t, p in enumerate(route_points))
-            num_ships_to_launch = route.plan.min_fleet_size() \
+            num_ships_to_launch = min_fleet_size \
                 if can_deplete_kore_fast and not len(route) == 2 \
                 else free_ships
             # Prevent sending huge long routes
-            if route.plan.min_fleet_size() > 21 and \
+            if min_fleet_size > 21 and \
                 (num_ships_to_launch > 0.2 * agent.ship_count or \
                  num_ships_to_launch > 0.5 * sy.estimate_shipyard_power(10)):
                 continue
@@ -111,7 +112,7 @@ def mine(agent: Player, remaining_time: float):
             continue
 
         # items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
-        # for i in range(0, 10):
+        # for i in range(0, min(len(items), 10)):
         #     route = items[i][0]
         #     score, num_ships_to_launch, board_risk = route_to_info[route]
         #     logger.info(f"{sy.point} Mining Route: {route.plan}, {score}, {board_risk}")
@@ -228,6 +229,9 @@ def find_shipyard_mining_routes(
 
                 if is_intercept_route(route, player, safety):
                     continue
+
+                # if wait_time > 2:
+                #     continue
 
                 routes.append(route)
                 route_set.add(route.plan.to_str())

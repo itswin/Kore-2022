@@ -8,11 +8,11 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import Point
-    from board import Board, Player, BoardRoute, PlanRoute, Shipyard
+    from board import Board, Player, BoardRoute, Shipyard, Spawn, DontLaunch
     from logger import logger
 else:
     from .geometry import Point
-    from .board import Board, Player, BoardRoute, PlanRoute, Shipyard
+    from .board import Board, Player, BoardRoute, Shipyard, Spawn, DontLaunch
     from .logger import logger
 
 # <--->
@@ -189,3 +189,14 @@ def create_scorer(sigma: float):
         return gaussian(x.distance_from(p), 0, sigma) / mid
     return g
 
+
+def _spawn(agent: Player, shipyard: Shipyard):
+    num_ships_to_spawn = min(
+        int(agent.available_kore() // agent.board.spawn_cost),
+        shipyard.max_ships_to_spawn,
+    )
+    if num_ships_to_spawn:
+        shipyard.action = Spawn(num_ships_to_spawn)
+    else:
+        shipyard.action = DontLaunch()
+    return num_ships_to_spawn

@@ -7,15 +7,13 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from geometry import PlanRoute
     from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard
-    from helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
+    from helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards, _spawn
     from logger import logger
-    from state import CoordinatedAttack
 else:
     from .geometry import PlanRoute
     from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard
-    from .helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards
+    from .helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards, _spawn
     from .logger import logger
-    from .state import CoordinatedAttack
 
 # <--->
 
@@ -138,7 +136,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                 break
         if not attacked:
             if best_candidate_sy is not None:
-                best_candidate_sy.action = DontLaunch()
+                _spawn(agent, best_candidate_sy)
                 logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, distance={best_candidate_time}")
             elif adjacent_action is not None:
                 adjacent_attacks.append((adjacent_sy, adjacent_action, adjacent_target_point))
@@ -330,8 +328,6 @@ def greedy_spawn(agent: Player):
 
 
 def spawn(agent: Player):
-    board = agent.board
-
     if not _need_more_ships(agent, agent.ship_count):
         return
 
@@ -340,15 +336,10 @@ def spawn(agent: Player):
     for shipyard in agent.shipyards:
         if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost),
-            shipyard.max_ships_to_spawn,
-        )
-        if num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
-            ship_count += num_ships_to_spawn
-            if ship_count > max_ship_count:
-                return
+
+        ship_count += _spawn(agent, shipyard)
+        if ship_count > max_ship_count:
+            return
 
 
 def conservative_save_kore(agent: Player):

@@ -6,12 +6,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from board import Spawn, Player, Launch, DontLaunch, Shipyard
-    from helpers import find_shortcut_routes
+    from board import Player, Launch, Shipyard
+    from helpers import find_shortcut_routes, _spawn
     from logger import logger
 else:
-    from .board import Spawn, Player, Launch, DontLaunch, Shipyard
-    from .helpers import find_shortcut_routes
+    from .board import Player, Launch, Shipyard
+    from .helpers import find_shortcut_routes, _spawn
     from .logger import logger
 
 # <--->
@@ -47,15 +47,8 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
             continue
 
         # spawn as much as possible
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost), sy.max_ships_to_spawn
-        )
-        if num_ships_to_spawn:
-            logger.info(f"Spawn ships to protect shipyard {sy.point}")
-            sy.action = Spawn(num_ships_to_spawn)
-        else:
-            logger.info(f"No kore to spawn ships to protect shipyard {sy.point}")
-            sy.action = DontLaunch()
+        num_ships_to_spawn = _spawn(agent, sy)
+        logger.info(f"Spawned {num_ships_to_spawn} ships to protect shipyard {sy.point}")
 
         need_help_shipyards.append(sy)
 
@@ -104,6 +97,6 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
                     )
                 else:
                     logger.error(f"No routes to send reinforcements {other_sy.point}->{sy.point}")
-                    other_sy.action = DontLaunch()
+                    _spawn(agent, other_sy)
             else:
                 logger.info(f"Not in time to save shipyard {other_sy.point}->{sy.point}")

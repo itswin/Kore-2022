@@ -8,18 +8,18 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from basic import max_ships_to_spawn
-    from board import Player, Shipyard, Launch, DontLaunch, FutureShipyard
+    from board import Player, Shipyard, Launch, FutureShipyard
     from geometry import Point
-    from helpers import find_shortcut_routes
+    from helpers import find_shortcut_routes, _spawn
     from logger import logger
-    from state import CoordinatedAttack
+    from state import CoordinatedAttack, PrepCoordinatedAttack, State
 else:
     from .basic import max_ships_to_spawn
-    from .board import Player, Shipyard, Launch, DontLaunch, FutureShipyard
+    from .board import Player, Shipyard, Launch, FutureShipyard
     from .geometry import Point
-    from .helpers import find_shortcut_routes
+    from .helpers import find_shortcut_routes, _spawn
     from .logger import logger
-    from .state import CoordinatedAttack
+    from .state import CoordinatedAttack, PrepCoordinatedAttack, State
 
 # <--->
 
@@ -135,7 +135,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
 
             if sy.available_ship_count <= power:
                 if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
-                    sy.action = DontLaunch()
+                    _spawn(agent, sy)
                     logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
                 continue
 
@@ -161,6 +161,14 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
 
 # Incoporate waiting also?
 def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, send_fraction: float = 1):
+    was_prepping = False
+    prepped_target = None
+    if isinstance(agent.state, PrepCoordinatedAttack):
+        prepped_target = agent.state.target
+    if agent.update_state_if_is(PrepCoordinatedAttack):
+        if not isinstance(agent.state, State):
+            return
+        was_prepping = True
     if agent.update_state_if_is(CoordinatedAttack):
         return
 
@@ -193,6 +201,30 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
         if my_ship_count > op_ship_count * 2:
             max_attack_distance = 20
             mult_factor = 2
+
+    best_sy_to_launch = None
+    best_attack_diff = None
+    best_t = None
+
+    if was_prepping:
+        max_attack_distance = max(max_attack_distance, 20)
+
+    my_shipyard_count = len(agent.shipyards)
+    op_shipyard_count = max(len(x.shipyards) for x in agent.opponents)
+    op_future_shipyard_count = max(len(x.future_shipyards) for x in agent.opponents)
+
+    # if my_shipyard_count > 1 and my_shipyard_count <= op_shipyard_count \
+    #     and op_future_shipyard_count > 0:
+    #     op_future_sy = agent.opponents[0].future_shipyards[0]
+    #     shipyards = list(filter(
+    #         lambda x: x.point.distance_from(op_future_sy.point) <= max_attack_distance,
+    #         agent_shipyards
+    #     ))
+    #     if len(shipyards) >= my_shipyard_count // 2:
+    #         logger.info("Prepping coordinated attack")
+    #         agent.state = PrepCoordinatedAttack(8)
+    #         agent.update_state()
+    #         was_prepping = isinstance(agent.state, State)
 
     for t in targets:
         shipyards = filter(
@@ -233,18 +265,30 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
 
             if num_shipyards_used != i:
                 break
+            power_est = t.estimate_shipyard_power(max_sy_dist)
             # logger.info(f"Coordinate {i} shipyards {t.point}, {total_power}, {t.estimate_shipyard_power(max_sy_dist)}")
-            if total_power >= t.estimate_shipyard_power(max_sy_dist) or \
+            if total_power >= power_est or \
                     (my_ship_count > mult_factor * op_ship_count and \
-                    total_power * mult_factor >= t.estimate_shipyard_power(max_sy_dist)):
+                    total_power * mult_factor >= power_est):
                 loaded_attack = True
                 break
+            attack_diff = total_power - power_est
+            if best_attack_diff is None or attack_diff > best_attack_diff and \
+                (prepped_target is None or t.point == prepped_target):
+                best_attack_diff = attack_diff
+                best_sy_to_launch = shipyard_to_launch
+                best_t = t
 
         if loaded_attack:
             logger.info(f"Starting coordinated attack: {t.point}, {shipyard_to_launch.items()}")
             agent.state = CoordinatedAttack(shipyard_to_launch, t.point)
             agent.update_state()
             break
+
+    if was_prepping and best_sy_to_launch is not None:
+        logger.info(f"Starting forced coordinated attack: {best_t.point}, {shipyard_to_launch.items()}")
+        agent.state = CoordinatedAttack(best_sy_to_launch, best_t.point)
+        agent.update_state()
 
 
 WHITTLE_COOLDOWN = 20
@@ -275,7 +319,7 @@ def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
 
 
 def whittle_attack(agent: Player, step: int,
-    max_attack_distance: int = 20, max_time_to_wait: int = 10, whittle_power: int = 50
+    max_attack_distance: int = 20, max_time_to_wait: int = 3, whittle_power: int = 50
 ):
     global last_whittle_attack
     if isinstance(agent.state, CoordinatedAttack):
@@ -314,7 +358,7 @@ def whittle_attack(agent: Player, step: int,
     attacked = False
     for t in targets:
         shipyards = sorted(
-            agent_shipyards, key=lambda x: t.point.distance_from(x.point)
+            agent_shipyards, key=lambda x: t.point.distance_from(x.point) + x.calc_time_for_ships_for_action(50)
         )
 
         for sy in shipyards:
@@ -328,9 +372,9 @@ def whittle_attack(agent: Player, step: int,
             if distance > max_attack_distance:
                 continue
 
-            if sy.available_ship_count <= whittle_power:
-                if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
-                    sy.action = DontLaunch()
+            if sy.available_ship_count < whittle_power:
+                if sy.estimate_shipyard_power(max_time_to_wait) >= whittle_power:
+                    _spawn(agent, sy)
                     logger.info(f"Saving for whittle attack {sy.point} -> {t.point}")
                 continue
 
@@ -345,7 +389,7 @@ def whittle_attack(agent: Player, step: int,
             )
 
             if routes:
-                best_route = min(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                best_route = min(routes, key=lambda route: (route.expected_kore(board, num_ships_to_launch), len(route)))
                 logger.info(
                     f"Whittle attack shipyard {sy.point}->{t.point}"
                 )
