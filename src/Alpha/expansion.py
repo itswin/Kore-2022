@@ -215,6 +215,8 @@ def need_more_shipyards(player: Player) -> int:
     board = player.board
     if isinstance(player.state, Expansion):
         return True
+    # if player.state.__repr__() != "State":
+    #     return False
 
     if player.ship_count < 100:
         return 0

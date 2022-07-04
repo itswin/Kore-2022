@@ -121,28 +121,33 @@ class CoordinatedAttack(State):
 
 
 class PrepCoordinatedAttack(State):
-    def __init__(self, max_time_to_wait: int, target: Point = None):
+    def __init__(self, max_time_to_wait: int, target: Point = None, fraction: float = 0.5):
         super().__init__()
         self.max_time_to_wait = max_time_to_wait
         self.target = target
-        self._half_ships_ready = False
+        self.fraction = fraction
+        self._enough_ships_ready = False
     
     def __repr__(self):
         return f"{self.__class__.__name__}({self.max_time_to_wait})({self.target})"
 
     def act(self, agent: Player):
         self.max_time_to_wait -= 1
+
         ship_count = agent.ship_count
         ships_ready = 0
+        for sy in agent.shipyards:
+            ships_ready += sy.available_ship_count
+        self._enough_ships_ready = ships_ready >= ship_count * self.fraction
+
+        if self.is_finished():
+            return
 
         for sy in agent.shipyards:
             _spawn(agent, sy)
-            ships_ready += sy.available_ship_count
-
-        self._half_ships_ready = ships_ready >= ship_count * 0.5
 
     def is_finished(self):
-        return self.max_time_to_wait <= 0 or self._half_ships_ready
+        return self.max_time_to_wait <= 0 or self._enough_ships_ready
 
     def next_state(self):
         return State()

@@ -347,6 +347,9 @@ class Shipyard(PositionObj):
         self._blocked_dirs_at_time = None
         self._reserved_ship_count = 0
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self._game_id}, position={self._point} ship_count={self._ship_count})"
+
     @property
     def turns_controlled(self):
         return self._turns_controlled
@@ -603,6 +606,9 @@ class Fleet(PositionObj):
 
     def __lt__(self, other):
         return other.__gt__(self)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self._game_id}, position={self._point}, player={self._player_id}, ship_count={self._ship_count}, kore={self._kore})"
 
     @property
     def ship_count(self):
