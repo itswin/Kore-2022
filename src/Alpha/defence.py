@@ -6,13 +6,15 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from board import Player, Launch, Shipyard
+    from board import Player, Launch, Shipyard, Spawn, AllowMine
     from helpers import find_shortcut_routes, _spawn
     from logger import logger
+    from state import Expansion, State
 else:
-    from .board import Player, Launch, Shipyard
+    from .board import Player, Launch, Shipyard, Spawn, AllowMine
     from .helpers import find_shortcut_routes, _spawn
     from .logger import logger
+    from .state import Expansion, State
 
 # <--->
 
@@ -50,6 +52,9 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
         num_ships_to_spawn = _spawn(agent, sy)
         logger.info(f"Spawned {num_ships_to_spawn} ships to protect shipyard {sy.point}")
 
+        if not isinstance(sy.action, Spawn):
+            sy.action = AllowMine(incoming_hostile_time // 2)
+
         need_help_shipyards.append(sy)
 
     for sy in agent.future_shipyards:
@@ -71,32 +76,34 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
         if ships_needed > 0:
             need_help_shipyards.append(sy)
 
-    for sy in need_help_shipyards:
-        incoming_hostile_fleets = sy.incoming_hostile_fleets
+    for help_sy in need_help_shipyards:
+        incoming_hostile_fleets = help_sy.incoming_hostile_fleets
         incoming_hostile_time = min(x.eta for x in incoming_hostile_fleets)
 
-        for other_sy in agent.shipyards:
-            if other_sy == sy or other_sy.action or not other_sy.available_ship_count:
+        for sy in agent.shipyards:
+            if sy == help_sy or sy.action or not sy.available_ship_count:
                 continue
 
-            distance = other_sy.distance_from(sy)
+            distance = sy.distance_from(help_sy)
             if distance < incoming_hostile_time - 1:
-                logger.info(f"Saving reinforcements for {other_sy.point}->{sy.point}")
-                other_sy.set_guard_ship_count(other_sy.ship_count)
+                num_ships_to_spawn = _spawn(agent, sy)
+                logger.info(f"Saving reinforcements for {sy.point}->{help_sy.point}. Spawned {num_ships_to_spawn} ships")
+                if not isinstance(sy.action, Spawn):
+                    sy.action = AllowMine(incoming_hostile_time // 2)
             elif distance == incoming_hostile_time - 1 or \
-                (len(agent.all_shipyards) < 5 and sy.point in self_built_sys):
+                (len(agent.all_shipyards) < 5 and help_sy.point in self_built_sys):
                 if len(agent.all_shipyards) < 5:
                     logger.info(f"Not many shipyards. Save shipyard at all costs")
                 routes = find_shortcut_routes(
-                    board, other_sy.point, sy.point, agent, other_sy.ship_count
+                    board, sy.point, help_sy.point, agent, sy.ship_count
                 )
                 if routes:
-                    logger.info(f"Send reinforcements {other_sy.point}->{sy.point}. Size: {other_sy.available_ship_count}")
-                    other_sy.action = Launch(
-                        other_sy.available_ship_count, random.choice(routes)
+                    logger.info(f"Send reinforcements {sy.point}->{help_sy.point}. Size: {sy.available_ship_count}")
+                    sy.action = Launch(
+                        sy.available_ship_count, random.choice(routes)
                     )
                 else:
-                    logger.error(f"No routes to send reinforcements {other_sy.point}->{sy.point}")
-                    _spawn(agent, other_sy)
+                    logger.error(f"No routes to send reinforcements {sy.point}->{help_sy.point}")
+                    _spawn(agent, sy)
             else:
-                logger.info(f"Not in time to save shipyard {other_sy.point}->{sy.point}")
+                logger.info(f"Not in time to save shipyard {sy.point}->{help_sy.point}")

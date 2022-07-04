@@ -314,15 +314,13 @@ def greedy_spawn(agent: Player):
         if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
 
-        if not can_greedy_spawn and \
+        if not can_greedy_spawn or \
             shipyard.ship_count > agent.ship_count * 0.2 / len(agent.all_shipyards):
             continue
 
-        num_ships_to_spawn = shipyard.max_ships_to_spawn
-        if int(agent.available_kore() // board.spawn_cost) >= num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
-
+        num_ships_to_spawn = _spawn(agent, shipyard)
         ship_count += num_ships_to_spawn
+        logger.info(f"Greedy spawn {shipyard.point} {num_ships_to_spawn}")
         if ship_count > max_ship_count:
             return
 
@@ -351,5 +349,5 @@ def save_kore(agent: Player):
     board = agent.board
 
     if board.steps_left < 25:
-        agent.set_kore_reserve(min(agent.available_kore(), 1.25 * sum(x.kore for x in agent.opponents)))
+        agent.inc_kore_reserve(min(agent.available_kore(), 1.25 * sum(x.kore for x in agent.opponents)))
         logger.info(f"Saved kore: {agent.kore_reserve}")

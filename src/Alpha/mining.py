@@ -11,12 +11,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 if IS_KAGGLE:
     from geometry import PlanRoute, Point
     from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine
-    from helpers import is_intercept_route, find_closest_shipyards
+    from helpers import is_intercept_route, find_closest_shipyards, _spawn
     from logger import logger
 else:
     from .geometry import PlanRoute, Point
     from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine
-    from .helpers import is_intercept_route, find_closest_shipyards
+    from .helpers import is_intercept_route, find_closest_shipyards, _spawn
     from .logger import logger
 
 # <--->
@@ -42,6 +42,9 @@ def mine(agent: Player, remaining_time: float):
         for fleet in op.fleets:
             op_ship_count.append(fleet.ship_count)
 
+    if board.step < 50 and not op_ship_count and agent.kore > board.spawn_cost:
+        return
+
     shipyard_count = len(agent.all_shipyards)
     if shipyard_count < 10:
         max_distance = 15
@@ -57,6 +60,15 @@ def mine(agent: Player, remaining_time: float):
     # use_second_points = len(agent.all_shipyards) < 10 and remaining_time > 30
     use_second_points = False
 
+    fleet_distance = []
+    for sy in agent.all_shipyards:
+        for f in sy.incoming_allied_fleets:
+            fleet_distance.append(len(f.route))
+
+    fleet_distance = fleet_distance or [1]
+    mean_fleet_distance = sum(fleet_distance) / len(fleet_distance)
+    target_mean_distance = 10
+
     def score_route(route: BoardRoute, num_ships_to_launch: int) -> float:
         # Don't do short routes if we need to spawn
         if num_turns_to_deplete_kore > 1 and len(route) == 2:
@@ -68,7 +80,8 @@ def mine(agent: Player, remaining_time: float):
                 return 0
 
         dist_penalty = sy.get_idle_turns_before(len(route)) / 20.0 if can_deplete_kore_fast else 0
-        return exp_kore / len(route) - dist_penalty
+        dist_bonus = 0
+        return exp_kore / len(route) - dist_penalty + dist_bonus
 
     for sy in agent.shipyards:
         sy_max_dist = max_distance
@@ -121,8 +134,12 @@ def mine(agent: Player, remaining_time: float):
         # for t, p in enumerate(best_route.points()):
         #     logger.info(f"{p} {t}, {agent.estimate_board_risk(p, t + 1 + best_route.time_to_mine)}")
         score, num_ships_to_launch, board_risk = route_to_info[best_route]
-        if len(best_route) < 4 and agent.kore >= 10:
+        if should_not_launch_small_fleet(
+            agent, best_route, can_deplete_kore_fast, num_ships_to_launch,
+            sy, mean_fleet_distance
+        ):
             logger.info(f"{sy.point} should spawn not launch small fleet. {best_route.plan} {num_ships_to_launch}")
+            _spawn(agent, sy)
             continue
         if best_route.can_execute():
             logger.info(f"{sy.point} Mining Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk}")
@@ -130,6 +147,24 @@ def mine(agent: Player, remaining_time: float):
         else:
             logger.info(f"{sy.point} Waiting for Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk} in {best_route.time_to_mine}")
 
+
+
+def should_not_launch_small_fleet(
+    agent: Player, best_route: BoardRoute, can_deplete_kore_fast: bool,
+    num_ships_to_launch: int, sy: Shipyard, mean_fleet_distance: int
+):
+    if len(best_route) < 4 and agent.kore >= 10:
+        return True
+    if agent.board.step < 50:
+        return False
+
+    if num_ships_to_launch < max(21, agent.ship_count // 20) or len(best_route) < mean_fleet_distance:
+        if not can_deplete_kore_fast:
+            return True
+        if agent.available_kore() > 1000:
+            return True
+
+    return False
 
 
 def find_shipyard_mining_routes(

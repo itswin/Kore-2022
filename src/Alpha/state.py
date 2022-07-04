@@ -167,6 +167,7 @@ class Expansion(State):
         new_shipyard_to_target = {}
 
         min_eta = min((min((x.eta for x in sy.incoming_allied_fleets), default=0) for sy in agent.shipyards), default=0)
+        max_opp_sy_power = max((x.ship_count for x in agent.opponents[0].shipyards), default=0)
 
         for sy, target in self.shipyard_to_target.items():
             found_sy = False
@@ -185,7 +186,8 @@ class Expansion(State):
                 new_shipyard_to_target[sy] = target
                 continue
 
-            if sy.available_ship_count < 63:
+            thresh = 50 if max_opp_sy_power >= 50 else 63
+            if sy.available_ship_count < thresh:
                 logger.info(f"Expansion: {sy.point} has {sy.available_ship_count} and is waiting to launch")
                 new_shipyard_to_target[sy] = target
                 _spawn(agent, sy)

@@ -700,6 +700,9 @@ class Player(Obj):
     def kore_reserve(self):
         return self._kore_reserve
 
+    def inc_kore_reserve(self, amount):
+        self._kore_reserve += amount
+
     def set_kore_reserve(self, kore_reserve):
         assert kore_reserve <= self._kore
         self._kore_reserve = kore_reserve
