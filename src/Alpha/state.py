@@ -210,11 +210,11 @@ class Expansion(State):
                     continue
 
                 plans = shipyard.get_plans_through([p, target])
-                rs = [BoardRoute(shipyard.point, plan) for plan in plans]
+                rs = [BoardRoute(shipyard.point, plan + PlanRoute([PlanPath(Convert)])) for plan in plans]
 
                 for route in rs:
                     if shipyard.available_ship_count < min_ship_count_for_flight_plan_len(
-                        len(route.plan.to_str()) + 1
+                        len(route.plan.to_str())
                     ):
                         continue
 
@@ -229,9 +229,6 @@ class Expansion(State):
 
             if routes:
                 route = max(routes, key=lambda route: (-len(route), route.expected_kore(board, sy.available_ship_count)))
-                route = BoardRoute(
-                    sy.point, route.plan + PlanRoute([PlanPath(Convert)])
-                )
                 logger.info(f"Building new sy {sy.point}->{route.end}")
                 sy.action = Launch(sy.available_ship_count, route)
                 self.self_built_sys.add(target)
