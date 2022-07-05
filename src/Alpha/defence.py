@@ -70,7 +70,7 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
             x.ship_count
             for x in incoming_allied_fleets
             if x.eta < incoming_hostile_time
-        )
+        ) - 50
 
         ships_needed = incoming_hostile_power - incoming_allied_power
         if ships_needed > 0:
