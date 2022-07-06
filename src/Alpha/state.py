@@ -103,15 +103,6 @@ class CoordinatedAttack(State):
     def next_state(self):
         return State()
 
-    def _spawn(self, agent: Player, shipyard: Shipyard):
-        board = agent.board
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost),
-            shipyard.max_ships_to_spawn,
-        )
-        if num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
-
     def is_sy_used(self, sy: Shipyard):
         for shipyard, _ in self.shipyard_to_launch.items():
             if shipyard.game_id == sy.game_id:
@@ -250,15 +241,6 @@ class Expansion(State):
 
     def next_state(self):
         return State()
-
-    def _spawn(self, agent: Player, shipyard: Shipyard):
-        board = agent.board
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost),
-            shipyard.max_ships_to_spawn,
-        )
-        if num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
 
     def is_sy_used(self, sy: Shipyard):
         for shipyard, _ in self.shipyard_to_target.items():

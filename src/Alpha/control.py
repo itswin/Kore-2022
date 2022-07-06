@@ -318,7 +318,10 @@ def greedy_spawn(agent: Player):
             shipyard.ship_count > agent.ship_count * 0.2 / len(agent.all_shipyards):
             continue
 
-        num_ships_to_spawn = _spawn(agent, shipyard)
+        num_ships_to_spawn = _spawn(agent, shipyard, False)
+        if not num_ships_to_spawn:
+            continue
+
         ship_count += num_ships_to_spawn
         logger.info(f"Greedy spawn {shipyard.point} {num_ships_to_spawn}")
         if ship_count > max_ship_count:

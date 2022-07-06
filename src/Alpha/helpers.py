@@ -190,13 +190,13 @@ def create_scorer(sigma: float):
     return g
 
 
-def _spawn(agent: Player, shipyard: Shipyard):
+def _spawn(agent: Player, shipyard: Shipyard, dont_launch: bool = True):
     num_ships_to_spawn = min(
         int(agent.available_kore() // agent.board.spawn_cost),
         shipyard.max_ships_to_spawn,
     )
     if num_ships_to_spawn:
         shipyard.action = Spawn(num_ships_to_spawn)
-    else:
+    elif dont_launch:
         shipyard.action = DontLaunch()
     return num_ships_to_spawn
