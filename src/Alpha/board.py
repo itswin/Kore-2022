@@ -102,8 +102,9 @@ class DontLaunch(DoNothing):
 
 
 class AllowMine(DoNothing):
-    def __init__(self, max_distance: int = 15):
+    def __init__(self, max_distance: int = 15, target: Point = None):
         self.max_distance = max_distance
+        self.target = target
 
     def __repr__(self):
         return f"AllowMine {self.max_distance}"

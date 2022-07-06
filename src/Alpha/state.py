@@ -200,7 +200,7 @@ class Expansion(State):
                     # Workaround to allow mining if no fleets out now.
                     if min_eta == 0:
                         min_eta = 30
-                    sy.action = AllowMine(min_eta // 2)
+                    sy.action = AllowMine(min_eta // 2, sy.point)
                 continue 
 
             target_distance = shipyard.distance_from(target) + 2 * (self.extra_distance)

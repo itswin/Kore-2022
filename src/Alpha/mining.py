@@ -85,10 +85,12 @@ def mine(agent: Player, remaining_time: float):
 
     for sy in agent.shipyards:
         sy_max_dist = max_distance
+        forced_destination = None
         if sy.action:
             if not isinstance(sy.action, AllowMine):
                 continue
             sy_max_dist = sy.action.max_distance
+            forced_destination = sy.action.target
 
         free_ships = sy.available_ship_count if my_ship_count < 105 else min(sy.available_ship_count, my_ship_count // 5)
 
@@ -96,7 +98,7 @@ def mine(agent: Player, remaining_time: float):
             continue
 
         routes = find_shipyard_mining_routes(
-            sy, safety=safety, max_distance=sy_max_dist, use_second_points=use_second_points
+            sy, safety=safety, max_distance=sy_max_dist, use_second_points=use_second_points, forced_destination=forced_destination
         )
 
         route_to_info = {}
@@ -168,7 +170,8 @@ def should_not_launch_small_fleet(
 
 
 def find_shipyard_mining_routes(
-    sy: Shipyard, safety=True, max_distance: int = 15, use_second_points: int = False
+    sy: Shipyard, safety=True, max_distance: int = 15, use_second_points: int = False,
+    forced_destination: Point = None
 ) -> List[BoardRoute]:
     if max_distance < 1:
         return []
@@ -180,6 +183,10 @@ def find_shipyard_mining_routes(
     def get_destinations(shipyards):
         destinations = set()
         for shipyard in shipyards:
+            if forced_destination:
+                if shipyard.point == forced_destination:
+                    destinations.add(shipyard)
+                continue
             siege = sum(x.ship_count for x in shipyard.incoming_hostile_fleets)
             if siege >= shipyard.ship_count:
                 continue
