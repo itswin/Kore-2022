@@ -175,7 +175,7 @@ def gaussian(x: float, mu: float, sigma: float):
     return 1 / (sigma * (2 * pi) ** 0.5) * exp(-0.5 * (x - mu) ** 2 / sigma ** 2)
 
 
-def create_scorer(sigma: float):
+def create_scorer(sigma: float, mu: float = 0):
     mid = gaussian(0, 0, sigma)
     mid1 = gaussian(0, 0, 2 * sigma)
     mid2 = gaussian(0, 0, 3 * sigma)
@@ -186,7 +186,7 @@ def create_scorer(sigma: float):
         #     return gaussian(x.distance_from(p), 0, 3 * sigma) / mid2
         # if dx == 1 or dy == 1:
         #     return gaussian(x.distance_from(p), 0, 2 * sigma) / mid1
-        return gaussian(x.distance_from(p), 0, sigma) / mid
+        return gaussian(x.distance_from(p), mu, sigma) / mid
     return g
 
 

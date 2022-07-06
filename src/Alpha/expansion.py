@@ -22,7 +22,7 @@ else:
 
 # <--->
 SHOW_EXPANSIONS = False
-NUM_SHOW_EXPANSIONS = 3
+NUM_SHOW_EXPANSIONS = 10
 
 def expand(
     player: Player, step: int, self_built_sys: Set[Shipyard], 
@@ -92,7 +92,7 @@ def find_best_shipyard(available_sys: Set[Shipyard], p: Point) -> Shipyard:
 def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
     board = player.board
 
-    kore_sigma = 5
+    kore_sigma = 4
     g = create_scorer(kore_sigma)
 
     def closer_bonus(point_to_closest_sy, x, p):
@@ -252,7 +252,7 @@ def need_more_shipyards(player: Player) -> int:
     if my_sy_count * 50 > my_ship_count:
         return 0
 
-    # if my_sy_count > op_sy_count and my_ship_count < op_ship_count + 25:
+    # if my_sy_count != 1 and my_sy_count >= op_sy_count and my_ship_count < op_ship_count - 25:
     #     return 0
 
     # needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance

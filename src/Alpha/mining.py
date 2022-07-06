@@ -21,6 +21,8 @@ else:
 
 # <--->
 
+SHOW_ROUTES = False
+NUM_SHOW_ROUTES = 5
 
 def mine(agent: Player, remaining_time: float):
     board = agent.board
@@ -69,7 +71,7 @@ def mine(agent: Player, remaining_time: float):
     mean_fleet_distance = sum(fleet_distance) / len(fleet_distance)
     target_mean_distance = 10
 
-    def score_route(route: BoardRoute, num_ships_to_launch: int) -> float:
+    def score_route(route: BoardRoute, num_ships_to_launch: int, board_risk: int) -> float:
         # Don't do short routes if we need to spawn
         if num_turns_to_deplete_kore > 1 and len(route) == 2:
             return 0
@@ -81,7 +83,9 @@ def mine(agent: Player, remaining_time: float):
 
         dist_penalty = sy.get_idle_turns_before(len(route)) / 20.0 if can_deplete_kore_fast else 0
         dist_bonus = 0
-        return exp_kore / len(route) - dist_penalty + dist_bonus
+        board_risk_penalty = max((board_risk - route.plan.min_fleet_size()) / 10.0, 0)
+        board_risk_penalty = 0
+        return exp_kore / len(route) - dist_penalty + dist_bonus - board_risk_penalty
 
     for sy in agent.shipyards:
         sy_max_dist = max_distance
@@ -120,17 +124,18 @@ def mine(agent: Player, remaining_time: float):
                 if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                     continue
 
-            score = score_route(route, num_ships_to_launch)
+            score = score_route(route, num_ships_to_launch, board_risk)
             route_to_info[route] = (score, num_ships_to_launch, board_risk)
 
         if not route_to_info:
             continue
 
-        # items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
-        # for i in range(0, min(len(items), 10)):
-        #     route = items[i][0]
-        #     score, num_ships_to_launch, board_risk = route_to_info[route]
-        #     logger.info(f"{sy.point} Mining Route: {route.plan}, {score}, {board_risk}")
+        if SHOW_ROUTES:
+            items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
+            for i in range(0, min(len(items), NUM_SHOW_ROUTES)):
+                route = items[i][0]
+                score, num_ships_to_launch, board_risk = route_to_info[route]
+                logger.info(f"{sy.point} Mining Route: {route.plan}, {score}, {board_risk}")
 
         best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
         # for t, p in enumerate(best_route.points()):
