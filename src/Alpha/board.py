@@ -102,12 +102,13 @@ class DontLaunch(DoNothing):
 
 
 class AllowMine(DoNothing):
-    def __init__(self, max_distance: int = 15, target: Point = None):
+    def __init__(self, max_distance: int = 15, target: Point = None, max_time: int = 30):
         self.max_distance = max_distance
+        self.max_time = max_time
         self.target = target
 
     def __repr__(self):
-        return f"AllowMine {self.max_distance}"
+        return f"AllowMine {self.max_distance} {self.target} {self.max_time}"
 
     def to_str(self):
         return NotImplementedError

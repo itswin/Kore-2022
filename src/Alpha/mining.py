@@ -90,11 +90,13 @@ def mine(agent: Player, remaining_time: float):
     for sy in agent.shipyards:
         sy_max_dist = max_distance
         forced_destination = None
+        max_time = max_distance * 2
         if sy.action:
             if not isinstance(sy.action, AllowMine):
                 continue
             sy_max_dist = sy.action.max_distance
             forced_destination = sy.action.target
+            max_time = sy.action.max_time
 
         free_ships = sy.available_ship_count if my_ship_count < 105 else min(sy.available_ship_count, my_ship_count // 5)
 
@@ -102,7 +104,8 @@ def mine(agent: Player, remaining_time: float):
             continue
 
         routes = find_shipyard_mining_routes(
-            sy, safety=safety, max_distance=sy_max_dist, use_second_points=use_second_points, forced_destination=forced_destination
+            sy, safety=safety, max_distance=sy_max_dist, use_second_points=use_second_points,
+            forced_destination=forced_destination, max_time=max_time
         )
 
         route_to_info = {}
@@ -176,7 +179,7 @@ def should_not_launch_small_fleet(
 
 def find_shipyard_mining_routes(
     sy: Shipyard, safety=True, max_distance: int = 15, use_second_points: int = False,
-    forced_destination: Point = None
+    forced_destination: Point = None, max_time: int = 30
 ) -> List[BoardRoute]:
     if max_distance < 1:
         return []
@@ -184,6 +187,7 @@ def find_shipyard_mining_routes(
     departure = sy.point
     player = sy.player
     board = player.board
+    max_time = min(max_time, max_distance * 2)
 
     def get_destinations(shipyards):
         destinations = set()
@@ -235,7 +239,7 @@ def find_shipyard_mining_routes(
                 wait_time = sy.calc_time_for_ships_for_action(best_plan.min_fleet_size())
                 route = MiningRoute(departure, best_plan, wait_time)
 
-                if len(route) > 2 * max_distance:
+                if len(route) > max_time:
                     continue
 
                 if route.plan.to_str() in route_set:
@@ -268,7 +272,7 @@ def find_shipyard_mining_routes(
                 wait_time = sy.calc_time_for_ships_for_action(plan.min_fleet_size())
                 route = MiningRoute(departure, plan, wait_time)
 
-                if len(route) > 2 * max_distance:
+                if len(route) > max_time:
                     continue
 
                 if route.plan.to_str() in route_set:

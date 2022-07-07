@@ -89,7 +89,7 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
                 num_ships_to_spawn = _spawn(agent, sy)
                 logger.info(f"Saving reinforcements for {sy.point}->{help_sy.point}. Spawned {num_ships_to_spawn} ships")
                 if not isinstance(sy.action, Spawn):
-                    sy.action = AllowMine(incoming_hostile_time // 2, sy.point)
+                    sy.action = AllowMine(incoming_hostile_time // 2, help_sy.point, incoming_hostile_time)
             elif distance == incoming_hostile_time - 1 or \
                 (len(agent.all_shipyards) < 5 and help_sy.point in self_built_sys):
                 if len(agent.all_shipyards) < 5:
