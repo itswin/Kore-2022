@@ -1,4 +1,3 @@
-import random
 import os
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
@@ -217,11 +216,12 @@ def adjacent_attack(agent: Player, max_distance: int = 10):
             if not routes:
                 continue
 
-            route = random.choice(routes)
             logger.info(
                 f"Adjacent attack {sy.point}->{target_point}, distance={distance}, target_time={target_time}"
             )
-            sy.action = Launch(num_ships_to_send, route)
+            best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_send))
+            sy.action = Launch(num_ships_to_send, best_route)
+
             for fleet in target_fleets:
                 fleets_to_be_attacked.add(fleet)
             break

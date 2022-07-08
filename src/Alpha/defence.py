@@ -1,4 +1,3 @@
-import random
 import os
 from typing import Set
 
@@ -55,7 +54,7 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
         if not isinstance(sy.action, Spawn):
             sy.action = AllowMine(incoming_hostile_time // 2, sy.point)
 
-        need_help_shipyards.append(sy)
+        need_help_shipyards.append((sy, ships_needed))
 
     for sy in agent.future_shipyards:
         incoming_hostile_fleets = sy.incoming_hostile_fleets
@@ -74,17 +73,44 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
 
         ships_needed = incoming_hostile_power - incoming_allied_power
         if ships_needed > 0:
-            need_help_shipyards.append(sy)
+            need_help_shipyards.append((sy, ships_needed))
 
-    for help_sy in need_help_shipyards:
+    for help_sy, ships_needed in need_help_shipyards:
         incoming_hostile_fleets = help_sy.incoming_hostile_fleets
         incoming_hostile_time = min(x.eta for x in incoming_hostile_fleets)
 
-        for sy in agent.shipyards:
-            if sy == help_sy or sy.action or not sy.available_ship_count:
+        shipyards = sorted(agent.shipyards, key=lambda x: x.distance_from(help_sy.point))
+        # help_count = 0
+        # for sy in shipyards:
+        #     if sy == help_sy or sy.action or not sy.available_ship_count:
+        #         continue
+        #     distance = sy.distance_from(help_sy)
+        #     if distance < incoming_hostile_time - 1:
+        #         help_count += sy.available_ship_count
+        # should_help_now = help_count >= ships_needed
+        # help_received = 0
+        is_done_helping = False
+
+        for sy in shipyards:
+            if sy == help_sy or sy.action or not sy.available_ship_count or is_done_helping:
                 continue
 
             distance = sy.distance_from(help_sy)
+            # if should_help_now:
+            #     routes = find_shortcut_routes(
+            #         board, sy.point, help_sy.point, agent, sy.ship_count
+            #     )
+            #     if not routes:
+            #         logger.error(f"No routes to send reinforcements {sy.point}->{help_sy.point}")
+            #         _spawn(agent, sy)
+            #         continue
+
+            #     num_ships_to_launch = sy.available_ship_count
+            #     best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
+            #     logger.info(f"Send reinforcements {sy.point}->{help_sy.point}. Size: {num_ships_to_launch}")
+            #     sy.action = Launch(num_ships_to_launch, best_route)
+            #     help_received += sy.available_ship_count
+            #     is_done_helping = help_received >= ships_needed
             if distance < incoming_hostile_time - 1:
                 num_ships_to_spawn = _spawn(agent, sy)
                 logger.info(f"Saving reinforcements for {sy.point}->{help_sy.point}. Spawned {num_ships_to_spawn} ships")
@@ -97,13 +123,15 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
                 routes = find_shortcut_routes(
                     board, sy.point, help_sy.point, agent, sy.ship_count
                 )
-                if routes:
-                    logger.info(f"Send reinforcements {sy.point}->{help_sy.point}. Size: {sy.available_ship_count}")
-                    sy.action = Launch(
-                        sy.available_ship_count, random.choice(routes)
-                    )
-                else:
+
+                if not routes:
                     logger.error(f"No routes to send reinforcements {sy.point}->{help_sy.point}")
                     _spawn(agent, sy)
+                    continue
+
+                num_ships_to_launch = sy.available_ship_count
+                best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                logger.info(f"Send reinforcements {sy.point}->{help_sy.point}. Size: {num_ships_to_launch}")
+                sy.action = Launch(num_ships_to_launch, best_route)
             else:
                 logger.info(f"Not in time to save shipyard {sy.point}->{help_sy.point}")

@@ -789,6 +789,10 @@ class Player(Obj):
     def shipyard_production_capacity(self):
         return sum(x.max_ships_to_spawn for x in self.shipyards)
 
+    @cached_property
+    def adj_shipyard_production_capacity(self, min_prod: int = 5):
+        return sum(max(min_prod, x.max_ships_to_spawn) for x in self.shipyards)
+
     def actions(self):
         if self.available_kore() < 0:
             logger.warning("Negative balance. Some ships will not spawn.")

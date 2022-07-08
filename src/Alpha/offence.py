@@ -319,7 +319,7 @@ def should_whittle_attack(agent: Player, step: int, min_overage: int = 50):
 
 
 def whittle_attack(agent: Player, step: int,
-    max_attack_distance: int = 20, max_time_to_wait: int = 3, whittle_power: int = 50
+    max_attack_distance: int = 10, max_time_to_wait: int = 3, whittle_power: int = 50
 ):
     global last_whittle_attack
     if isinstance(agent.state, CoordinatedAttack):

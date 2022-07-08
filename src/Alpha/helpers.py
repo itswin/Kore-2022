@@ -1,5 +1,4 @@
 import os
-import random
 from typing import List, Tuple
 from math import pi, exp
 
