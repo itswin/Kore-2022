@@ -131,6 +131,7 @@ def mine(agent: Player, remaining_time: float):
             route_to_info[route] = (score, num_ships_to_launch, board_risk)
 
         if not route_to_info:
+            logger.info(f"No mining routes for {sy.point}")
             continue
 
         if SHOW_ROUTES:
@@ -189,6 +190,31 @@ def find_shipyard_mining_routes(
     board = player.board
     max_time = min(max_time, max_distance * 2)
 
+    def force_destination_to(choices: List[Shipyard], closest_n: int):
+        nonlocal forced_destination
+        if forced_destination or not choices:
+            return
+
+        choice_sy = min(choices, key=lambda x: x.distance_from(sy))
+        sorted_sys = sorted(sy.player.shipyards, key=lambda x: x.distance_from(choice_sy))
+        num_closest_sys_to_help = min(closest_n, len(sorted_sys))
+        for i in range(0, num_closest_sys_to_help):
+            if sorted_sys[i].point == sy.point:
+                incoming_allied_power = sum(x.ship_count for x in sorted_sys[i].incoming_allied_fleets)
+                avg_ships = player.ship_count / max(len(player.all_shipyards), 1)
+                power = sorted_sys[i].ship_count + incoming_allied_power
+                if power < avg_ships:
+                    forced_destination = choice_sy.point
+
+    # recently_attacked_sys = sy.player.memory.recently_attacked_sys(sy.board.step)
+    # force_destination_to(recently_attacked_sys, 2)
+
+    young_sys = sy.player.future_shipyards + list(sy for sy in sy.player.shipyards if sy.turns_controlled < 5)
+    force_destination_to(young_sys, 2)
+
+    if forced_destination:
+        logger.info(f"{sy.point} Forcing mining to {forced_destination}")
+
     def get_destinations(shipyards):
         destinations = set()
         for shipyard in shipyards:
@@ -205,9 +231,6 @@ def find_shipyard_mining_routes(
     destinations = get_destinations(sy.player.shipyards)
     future_destinations = get_destinations(sy.player.future_shipyards)
 
-    if not destinations:
-        return []
-
     routes = []
     route_set = set()
     if use_second_points:
@@ -222,16 +245,12 @@ def find_shipyard_mining_routes(
                 cs = [c] if adj == c else [c, adj]
 
                 dist_through_cs = sum(c.distance_from(d) for c, d in zip(cs, cs[1:])) + sy.distance_from(cs[0])
-                dest_sy = min(destinations, key=lambda x: cs[-1].distance_from(x.point))
-                future_dest_sys = list(filter(
-                    lambda x: x.time_to_build <= dist_through_cs + x.distance_from(cs[-1]),
+                future_dest_sys = set(filter(
+                    lambda x: (x.time_to_build <= dist_through_cs + x.distance_from(cs[-1])) and (x.point != c and x.point != adj),
                     future_destinations
                 ))
-
-                if future_dest_sys:
-                    future_dest_sy = min(future_dest_sys, key=lambda x: x.distance_from(cs[-1]))
-                    if future_dest_sy.point != c and future_dest_sy.point != adj:
-                        dest_sy = min([dest_sy, future_dest_sy], key=lambda x: x.distance_from(cs[-1]))
+                temp_dests = destinations | future_dest_sys
+                dest_sy = min(destinations, key=lambda x: cs[-1].distance_from(x.point))
 
                 destination = dest_sy.point
                 points = [departure] + cs + [destination]
@@ -255,15 +274,14 @@ def find_shipyard_mining_routes(
             if c == departure or any(c == x.point for x in destinations):
                 continue
 
-            dest_sy = min(destinations, key=lambda x: c.distance_from(x.point))
-            future_dest_sys = list(filter(
+            future_dest_sys = set(filter(
                 lambda x: x.time_to_build <= x.distance_from(c) + sy.distance_from(c),
                 future_destinations
             ))
-
-            if future_dest_sys:
-                future_dest_sy = min(future_dest_sys, key=lambda x: c.distance_from(x.point))
-                dest_sy = min([dest_sy, future_dest_sy], key=lambda x: c.distance_from(x.point))
+            temp_dests = destinations | future_dest_sys
+            if not temp_dests:
+                continue
+            dest_sy = min(temp_dests, key=lambda x: c.distance_from(x.point))
 
             destination = dest_sy.point
             plans = departure.get_plans_through([c, destination])
