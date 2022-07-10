@@ -698,7 +698,10 @@ class Player(Obj):
         self._start_time = time.time()
         self._board_risk = None
         self._board_risk_not_adj = None
+        self._optimistic_board_risk = None
+        self._optimistic_board_risk_not_adj = None
         self.state = None
+        self.memory = None
 
     @property
     def kore(self):
@@ -790,6 +793,10 @@ class Player(Obj):
         return sum(x.max_ships_to_spawn for x in self.shipyards)
 
     @cached_property
+    def avg_shipyard_production_capacity(self):
+        return self.shipyard_production_capacity / max(len(self.shipyards), 1)
+
+    @cached_property
     def adj_shipyard_production_capacity(self, min_prod: int = 5):
         return sum(max(min_prod, x.max_ships_to_spawn) for x in self.shipyards)
 
@@ -843,39 +850,59 @@ class Player(Obj):
 
         return power
 
+    def estimate_optimistic_power_for_point_at_time(self, point: Point, time: int) -> int:
+        if time < 0:
+            return 0
+
+        power = max(
+            ((sy.estimate_shipyard_power(time - sy.distance_from(point)) - sy.ship_count)
+            for sy in self.all_shipyards),
+            default=0
+        )
+
+        return power
+
     def is_board_risk_worth(self, risk: int, num_ships: int, sy: Shipyard) -> bool:
         if risk >= num_ships:
             if self.board.step < 50 or self.ship_count < 50 or \
                 num_ships > 0.2 * self.ship_count or num_ships > 0.5 * sy.estimate_shipyard_power(10):
                 return False
-            return num_ships > risk // 2
+            return num_ships > risk * 0.75
         return True
 
-    def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
+    def estimate_board_risk(self, p: Point, time: int, max_time: int = 40, pessimistic: bool = True) -> int:
         if self._board_risk is None:
             self._board_risk, self._board_risk_not_adj = self._estimate_board_risk()
+            self._optimistic_board_risk, self._optimistic_board_risk_not_adj = self._estimate_board_risk(pessimistic=False)
         if time < 0:
             return 0
-        return self._board_risk[p][min(time, max_time)]
+        time = min(time, max_time)
+        return self._board_risk[p][time] if pessimistic else self._optimistic_board_risk[p][time]
 
-    def estimate_board_risk_not_adj(self, p: Point, time: int, max_time: int = 40) -> int:
+    def estimate_board_risk_not_adj(self, p: Point, time: int, max_time: int = 40, pessimistic: bool = True) -> int:
         if self._board_risk is None:
             self._board_risk, self._board_risk_not_adj = self._estimate_board_risk()
+            self._optimistic_board_risk, self._optimistic_board_risk_not_adj = self._estimate_board_risk(pessimistic=False)
         if time < 0:
             return 0
-        return self._board_risk_not_adj[p][min(time, max_time)]
+        time = min(time, max_time)
+        return self._board_risk_not_adj[p][time] if pessimistic else self._optimistic_board_risk_not_adj[p][time]
 
-    def _estimate_board_risk(self, max_time: int = 40) -> Dict[Point, Dict[int, int]]:
+    def _estimate_board_risk(self, max_time: int = 40, pessimistic: bool = True) -> Dict[Point, Dict[int, int]]:
         board = self.board
         opps = self.opponents
         if len(opps) < 1:
             return {}
         opp = opps[0]
+        if pessimistic:
+            func = lambda p, dt: opp.estimate_power_for_point_at_time(p, dt)
+        else:
+            func = lambda p, dt: opp.estimate_optimistic_power_for_point_at_time(p, dt)
 
         point_to_time_to_score = defaultdict(dict)
         for p in board:
             for dt in range(max_time + 1):
-                point_to_time_to_score[p][dt] = opp.estimate_power_for_point_at_time(p, dt)
+                point_to_time_to_score[p][dt] = func(p, dt)
 
         adj_point_to_time_to_score = defaultdict(dict)
         for p in board:

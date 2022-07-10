@@ -14,7 +14,7 @@ if IS_KAGGLE:
     from expansion import expand
     from mining import mine
     from control import spawn, greedy_spawn, adjacent_attack, direct_attack, save_kore, conservative_save_kore
-    from state import State
+    from state import State, Memory
 else:
     from .board import Board
     from .geometry import Point
@@ -24,18 +24,20 @@ else:
     from .expansion import expand
     from .mining import mine
     from .control import spawn, greedy_spawn, adjacent_attack, direct_attack, save_kore, conservative_save_kore
-    from .state import State
+    from .state import State, Memory
 # <--->
 
 prev_state: State = State()
 self_built_sys: Set[Point] = set()
 lost_sys: Set[Point] = set()
+memory: Memory = Memory()
 initialized = False
 
 def agent(obs, conf):
     global prev_state
     global self_built_sys
     global lost_sys
+    global memory
     global initialized
     if not initialized:
         init_logger(logger)
@@ -69,6 +71,10 @@ def agent(obs, conf):
             logger.info(f"State: {prev_state}")
         a.state = prev_state
 
+        memory.update_memory(a)
+        a.memory = memory
+        logger.info(f"Memory: {memory}")
+
         conservative_save_kore(a)
         defend_shipyards(a, self_built_sys)
         save_kore(a)
@@ -83,6 +89,7 @@ def agent(obs, conf):
         spawn(a)
 
         prev_state = a.state
+        memory = a.memory
     except:
         logger.error(traceback.format_exc())
         exit()

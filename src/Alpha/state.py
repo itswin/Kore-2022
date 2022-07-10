@@ -1,5 +1,6 @@
+from collections import defaultdict
 import os
-from typing import Dict, Tuple, Set
+from typing import Dict, Tuple, Set, List
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
@@ -17,6 +18,31 @@ else:
     from .helpers import find_shortcut_routes, is_safety_route_to_convert, _spawn
     from .logger import logger
 
+class Memory:
+    def __init__(self):
+        self.agent = None
+        self.sy_to_turn_attacked = defaultdict(int)
+
+    def __repr__(self):
+        return f"Memory(sy_to_turn_attacked={self.sy_to_turn_attacked})"
+
+    def update_memory(self, agent: Player):
+        self.agent = agent
+        new_sy_to_turn_attacked = defaultdict(int)
+        for sy in agent.shipyards:
+            if sy.incoming_hostile_fleets:
+                new_sy_to_turn_attacked[sy.point] = agent.board.step
+            else:
+
+                new_sy_to_turn_attacked[sy.point] = self.sy_to_turn_attacked[sy.point]
+        self.sy_to_turn_attacked = new_sy_to_turn_attacked
+
+    def recently_attacked_sys(self, turn: int, within_turns: int = 5) -> List[Point]:
+        return [
+            sy
+            for sy in self.agent.shipyards
+            if self.sy_to_turn_attacked[sy.point] + within_turns >= turn
+        ]
 
 class State:
     def __init__(self):
@@ -46,7 +72,7 @@ class CoordinatedAttack(State):
         self._max_timeout = max_timeout
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.shipyard_to_launch}, {self.target})"
+        return f"{self.__class__.__name__}({list((sy.point, (power, wait_time)) for (sy, (power, wait_time)) in self.shipyard_to_launch.items())}, {self.target})"
 
     def act(self, agent: Player):
         board = agent.board
