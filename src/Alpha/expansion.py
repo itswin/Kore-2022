@@ -1,4 +1,3 @@
-import random
 import math
 import os
 from typing import Dict, Set
@@ -151,7 +150,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
             not closest_sy
             or closest_sy.player_id != player.game_id
             or min_distance < 4
-            or min_distance > 8
+            or min_distance > 6
         ):
             continue
 
@@ -218,7 +217,14 @@ def need_more_shipyards(player: Player) -> int:
     # if player.state.__repr__() != "State":
     #     return False
 
-    if player.ship_count < 100:
+    op_shipyard_positions = {
+        x.point for x in board.all_shipyards if x.player_id != player.game_id
+    }
+    attacking_count = sum(
+        x.ship_count for x in player.fleets if x.route.end in op_shipyard_positions
+    )
+    avail_sy_count = player.ship_count - attacking_count
+    if avail_sy_count < 100:
         return 0
 
     fleet_distance = []
@@ -231,7 +237,7 @@ def need_more_shipyards(player: Player) -> int:
 
     mean_fleet_distance = sum(fleet_distance) / len(fleet_distance)
 
-    shipyard_production_capacity = player.shipyard_production_capacity
+    shipyard_production_capacity = player.adj_shipyard_production_capacity
 
     steps_left = board.steps_left
     if steps_left > 100:
@@ -246,10 +252,10 @@ def need_more_shipyards(player: Player) -> int:
     my_sy_count = len(player.all_shipyards)
     op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
 
-    my_ship_count = player.ship_count
+    my_ship_count = avail_sy_count
     op_ship_count = max(x.ship_count for x in player.opponents)
 
-    if my_sy_count * 50 > my_ship_count:
+    if my_sy_count * 75 > my_ship_count:
         return 0
 
     # if my_sy_count != 1 and my_sy_count >= op_sy_count and my_ship_count < op_ship_count - 25:
@@ -262,7 +268,7 @@ def need_more_shipyards(player: Player) -> int:
     # if my_sy_count < op_sy_count and op_sy_count <= 5:
     #     return 1
 
-    # mean_fleet_distance = max(mean_fleet_distance, 10)
+    # mean_fleet_distance = max(mean_fleet_distance, 8)
     logger.info(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
     needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance
     # ship_count_needed = my_ship_count > my_sy_count * 150
@@ -270,6 +276,11 @@ def need_more_shipyards(player: Player) -> int:
     # logger.info(f"Needed: {ship_count_needed}, {150 * shipyard_production_capacity}")
     # needed = player.kore > kore_needed
     # needed = needed or my_sy_count * 150 > my_ship_count
+
+    if my_sy_count == 1 and my_ship_count >= 150:
+        needed = True
+        logger.info(f"Lots of ships for first expansion")
+
     if not needed:
         return 0
 
