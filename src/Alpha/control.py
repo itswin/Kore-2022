@@ -97,6 +97,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                 routes.sort(key=lambda route: route.expected_kore(board, num_ships_to_launch))
                 for route in routes:
                     route_points = route.points()
+                    route_points = route_points[:-2] if len(route_points) > 2 else route_points
                     if num_ships_to_launch < route.plan.min_fleet_size():
                         continue
 
@@ -136,7 +137,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
         if not attacked:
             if best_candidate_sy is not None:
                 _spawn(agent, best_candidate_sy)
-                logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, distance={best_candidate_time}")
+                logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, time={best_candidate_time}")
             elif adjacent_action is not None:
                 adjacent_attacks.append((adjacent_sy, adjacent_action, adjacent_target_point))
 
@@ -345,6 +346,8 @@ def spawn(agent: Player):
 
 def conservative_save_kore(agent: Player):
     if agent.ship_count > 1.1 * sum(x.ship_count for x in agent.opponents):
+        save_kore(agent)
+    if agent.board.steps_left < 10:
         save_kore(agent)
 
 

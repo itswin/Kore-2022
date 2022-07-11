@@ -33,6 +33,12 @@ class _ShipyardTarget:
     def __repr__(self):
         return f"Target {self.shipyard}"
 
+    @property
+    def max_ships_to_spawn(self) -> int:
+        if isinstance(self.shipyard, Shipyard):
+            return self.shipyard.max_ships_to_spawn
+        return 1
+
     def estimate_shipyard_power(self, time):
         help_power = 0
         board = self.shipyard.board
@@ -45,6 +51,8 @@ class _ShipyardTarget:
             for f in sy.incoming_allied_fleets:
                 time_to_fleet_kore[f.eta] += f.expected_kore()
                 shipyard_reinforcements[sy][f.eta] += f.ship_count
+            for f in sy.incoming_hostile_fleets:
+                shipyard_reinforcements[sy][f.eta] -= f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
@@ -105,7 +113,7 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
     if not targets:
         return
 
-    targets.sort(key=lambda x: x.distance_from_shipyards)
+    targets.sort(key=lambda x: (-x.max_ships_to_spawn, x.distance_from_shipyards))
 
     my_ship_count = agent.ship_count
     op_ship_count = max(x.ship_count for x in agent.opponents)
@@ -134,9 +142,14 @@ def capture_shipyards(agent: Player, max_attack_distance: int = 10, max_time_to_
             power = t.estimate_shipyard_power(distance)
 
             if sy.available_ship_count <= power:
-                if sy.estimate_shipyard_power(max_time_to_wait) >= t.estimate_shipyard_power(distance + max_time_to_wait):
+                my_power = sy.estimate_shipyard_power(max_time_to_wait)
+                op_power = t.estimate_shipyard_power(distance + max_time_to_wait)
+                if my_power >= op_power:
                     _spawn(agent, sy)
-                    logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}")
+                    logger.info(f"Saving for capturing shipyard {sy.point} -> {t.point}. {my_power} > {op_power}")
+                else:
+                    # logger.info(f"NOT saving for capturing shipyard {sy.point} -> {t.point}. {my_power} > {op_power}")
+                    pass
                 continue
 
             num_ships_to_launch = min(sy.available_ship_count, max(int(power * 1.2), 21))
@@ -189,7 +202,7 @@ def coordinate_shipyard_capture(agent: Player, max_attack_distance: int = 10, se
     if not targets:
         return
 
-    targets.sort(key=lambda x: x.distance_from_shipyards)
+    targets.sort(key=lambda x: (-x.max_ships_to_spawn, x.distance_from_shipyards))
 
     my_ship_count = agent.ship_count
     op_ship_count = max(x.ship_count for x in agent.opponents)

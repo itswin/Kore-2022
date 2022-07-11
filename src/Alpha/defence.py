@@ -130,7 +130,10 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
                     continue
 
                 num_ships_to_launch = sy.available_ship_count
-                best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                if distance == incoming_hostile_time - 1:
+                    best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                else:
+                    best_route = min(routes, key=lambda route: route.expected_kore(board, num_ships_to_launch))
                 logger.info(f"Send reinforcements {sy.point}->{help_sy.point}. Size: {num_ships_to_launch}")
                 sy.action = Launch(num_ships_to_launch, best_route)
             else:
