@@ -409,6 +409,8 @@ class Shipyard(PositionObj):
         shipyard_reinforcements = defaultdict(int)
         for f in self.incoming_allied_fleets:
             shipyard_reinforcements[f.eta] += f.ship_count
+        for f in self.incoming_hostile_fleets:
+            shipyard_reinforcements[f.eta] -= f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
@@ -550,6 +552,8 @@ class FutureShipyard(PositionObj):
             # FutureShipyard considers its own fleet as incoming
             if f.game_id != self.game_id:
                 shipyard_reinforcements[f.eta] += f.ship_count
+        for f in self.incoming_hostile_fleets:
+            shipyard_reinforcements[f.eta] -= f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
