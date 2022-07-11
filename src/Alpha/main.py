@@ -73,7 +73,7 @@ def agent(obs, conf):
 
         memory.update_memory(a)
         a.memory = memory
-        logger.info(f"Memory: {memory}")
+        # logger.info(f"Memory: {memory}")
 
         conservative_save_kore(a)
         defend_shipyards(a, self_built_sys)

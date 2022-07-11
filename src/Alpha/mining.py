@@ -71,7 +71,7 @@ def mine(agent: Player, remaining_time: float):
     mean_fleet_distance = sum(fleet_distance) / len(fleet_distance)
     target_mean_distance = 10
 
-    def score_route(route: BoardRoute, num_ships_to_launch: int, board_risk: int) -> float:
+    def score_route(route: BoardRoute, num_ships_to_launch: int, board_risk: int, free_ships: int) -> float:
         # Don't do short routes if we need to spawn
         if num_turns_to_deplete_kore > 1 and len(route) == 2:
             return 0
@@ -85,7 +85,11 @@ def mine(agent: Player, remaining_time: float):
         dist_bonus = 0
         board_risk_penalty = max((board_risk - route.plan.min_fleet_size()) / 10.0, 0)
         board_risk_penalty = 0
-        return exp_kore / len(route) - dist_penalty + dist_bonus - board_risk_penalty
+        percentage_bonus = num_ships_to_launch / free_ships
+        return exp_kore / len(route) - dist_penalty + dist_bonus - board_risk_penalty + percentage_bonus
+    
+    def is_short_route(route):
+        return len(route) < 6
 
     for sy in agent.shipyards:
         sy_max_dist = max_distance
@@ -98,7 +102,8 @@ def mine(agent: Player, remaining_time: float):
             forced_destination = sy.action.target
             max_time = sy.action.max_time
 
-        free_ships = sy.available_ship_count if my_ship_count < 105 else min(sy.available_ship_count, my_ship_count // 5)
+        free_ships = sy.available_ship_count
+        num_short_routes = sum(1 for f in sy.incoming_allied_fleets if is_short_route(f.route))
 
         if free_ships <= 2:
             continue
@@ -111,12 +116,18 @@ def mine(agent: Player, remaining_time: float):
         route_to_info = {}
         for route in routes:
             route_points = route.points()
+            route_points = route_points[:-2] if len(route_points) > 2 else route_points
 
+            if is_short_route(route) and num_short_routes >= 2:
+                continue
             min_fleet_size = route.plan.min_fleet_size()
             board_risk = max(agent.estimate_board_risk(p, t + 1 + route.time_to_mine) for t, p in enumerate(route_points))
             num_ships_to_launch = min_fleet_size \
                 if can_deplete_kore_fast and not len(route) == 2 \
                 else free_ships
+            # Clip number of ships to launch
+            num_ships_to_launch = max(num_ships_to_launch, free_ships // 4)
+            num_ships_to_launch = min(num_ships_to_launch, max(my_ship_count // 5, min_fleet_size))
             # Prevent sending huge long routes
             if min_fleet_size > 21 and \
                 (num_ships_to_launch > 0.2 * agent.ship_count or \
@@ -126,37 +137,48 @@ def mine(agent: Player, remaining_time: float):
                 num_ships_to_launch = min(free_ships, board_risk + 1)
                 if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
                     continue
+            optimistic_board_risk = max(agent.estimate_board_risk(p, t + 1 + route.time_to_mine, pessimistic=False) for t, p in enumerate(route_points))
+            if optimistic_board_risk >= num_ships_to_launch:
+                num_ships_to_launch = min(free_ships, optimistic_board_risk + 1)
+                if optimistic_board_risk >= num_ships_to_launch:
+                    continue
+            if my_ship_count > 105 and num_ships_to_launch > my_ship_count // 5:
+                continue
 
-            score = score_route(route, num_ships_to_launch, board_risk)
+            score = score_route(route, num_ships_to_launch, board_risk, free_ships)
             route_to_info[route] = (score, num_ships_to_launch, board_risk)
 
         if not route_to_info:
             logger.info(f"No mining routes for {sy.point}")
             continue
 
+        items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
         if SHOW_ROUTES:
-            items = sorted(route_to_info.items(), key=lambda x: x[1], reverse=True)
             for i in range(0, min(len(items), NUM_SHOW_ROUTES)):
                 route = items[i][0]
                 score, num_ships_to_launch, board_risk = route_to_info[route]
                 logger.info(f"{sy.point} Mining Route: {route.plan}, {score}, {board_risk}")
 
-        best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
-        # for t, p in enumerate(best_route.points()):
-        #     logger.info(f"{p} {t}, {agent.estimate_board_risk(p, t + 1 + best_route.time_to_mine)}")
-        score, num_ships_to_launch, board_risk = route_to_info[best_route]
-        if should_not_launch_small_fleet(
-            agent, best_route, can_deplete_kore_fast, num_ships_to_launch,
-            sy, mean_fleet_distance
-        ):
-            logger.info(f"{sy.point} should spawn not launch small fleet. {best_route.plan} {num_ships_to_launch}")
-            _spawn(agent, sy)
-            continue
-        if best_route.can_execute():
-            logger.info(f"{sy.point} Mining Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk}")
-            sy.action = Launch(num_ships_to_launch, best_route)
-        else:
-            logger.info(f"{sy.point} Waiting for Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk} in {best_route.time_to_mine}")
+        for i in range(min(1, len(items))):
+            # best_route = max(route_to_info, key=lambda x: route_to_info[x][0])
+            best_route = items[i][0]
+            # for t, p in enumerate(best_route.points()):
+            #     logger.info(f"{p} {t}, {agent.estimate_board_risk(p, t + 1 + best_route.time_to_mine)}")
+            score, num_ships_to_launch, board_risk = route_to_info[best_route]
+            if should_not_launch_small_fleet(
+                agent, best_route, can_deplete_kore_fast, num_ships_to_launch,
+                sy, mean_fleet_distance
+            ):
+                logger.info(f"{sy.point} should spawn not launch small fleet. {best_route.plan} {num_ships_to_launch}")
+                _spawn(agent, sy)
+                continue
+            if best_route.can_execute():
+                logger.info(f"{sy.point} Mining Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk}")
+                sy.action = Launch(num_ships_to_launch, best_route)
+                break
+            else:
+                logger.info(f"{sy.point} Waiting for Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk} in {best_route.time_to_mine}")
+                break
 
 
 
@@ -171,8 +193,13 @@ def should_not_launch_small_fleet(
 
     if num_ships_to_launch < max(21, agent.ship_count // 20) or len(best_route) < mean_fleet_distance:
         if not can_deplete_kore_fast:
+            logger.info(f"Can not deplete kore fast")
             return True
         if agent.available_kore() > 1000:
+            logger.info(f"Lots of kore")
+            return True
+        if sy.max_ships_to_spawn > agent.avg_shipyard_production_capacity and agent.kore >= sy.max_ships_to_spawn * 10 * 5:
+            logger.info(f"Better than average production")
             return True
 
     return False
@@ -195,16 +222,24 @@ def find_shipyard_mining_routes(
         if forced_destination or not choices:
             return
 
+        # Don't send to one of these if it is getting sieged or has enough ships
         choice_sy = min(choices, key=lambda x: x.distance_from(sy))
+        incoming_hostile_power = sum(x.ship_count for x in choice_sy.incoming_hostile_fleets)
+        incoming_allied_power = sum(x.ship_count for x in choice_sy.incoming_allied_fleets)
+        future_power = choice_sy.ship_count + incoming_allied_power - incoming_hostile_power
+        if future_power <= 0:
+            return
+
+        avg_ships = player.ship_count / max(len(player.all_shipyards), 1)
+        if future_power > avg_ships:
+            return
+
         sorted_sys = sorted(sy.player.shipyards, key=lambda x: x.distance_from(choice_sy))
         num_closest_sys_to_help = min(closest_n, len(sorted_sys))
         for i in range(0, num_closest_sys_to_help):
-            if sorted_sys[i].point == sy.point:
-                incoming_allied_power = sum(x.ship_count for x in sorted_sys[i].incoming_allied_fleets)
-                avg_ships = player.ship_count / max(len(player.all_shipyards), 1)
-                power = sorted_sys[i].ship_count + incoming_allied_power
-                if power < avg_ships:
-                    forced_destination = choice_sy.point
+            shipyard = sorted_sys[i]
+            if shipyard.point == sy.point:
+                forced_destination = choice_sy.point
 
     # recently_attacked_sys = sy.player.memory.recently_attacked_sys(sy.board.step)
     # force_destination_to(recently_attacked_sys, 2)
@@ -223,7 +258,8 @@ def find_shipyard_mining_routes(
                     destinations.add(shipyard)
                 continue
             siege = sum(x.ship_count for x in shipyard.incoming_hostile_fleets)
-            if siege >= shipyard.ship_count:
+            help = sum(x.ship_count for x in shipyard.incoming_allied_fleets)
+            if siege >= shipyard.ship_count + help:
                 continue
             destinations.add(shipyard)
         return destinations
