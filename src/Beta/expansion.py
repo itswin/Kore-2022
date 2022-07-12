@@ -1,4 +1,3 @@
-import random
 import math
 import os
 from typing import Dict, Set
@@ -12,15 +11,18 @@ if IS_KAGGLE:
     from board import Player, Shipyard
     from logger import logger
     from helpers import find_closest_shipyards, create_scorer
-    from state import Expansion, PrepCoordinatedAttack
+    from state import Expansion, PrepCoordinatedAttack, State
 else:
     from .geometry import Convert, Point
     from .board import Player, Shipyard
     from .logger import logger
     from .helpers import find_closest_shipyards, create_scorer
-    from .state import Expansion, PrepCoordinatedAttack
+    from .state import Expansion, PrepCoordinatedAttack, State
 
 # <--->
+SHOW_EXPANSIONS = False
+NUM_SHOW_EXPANSIONS = 8
+
 def expand(
     player: Player, step: int, self_built_sys: Set[Shipyard], 
     lost_sys: Set[Shipyard], max_time_to_wait: int = 10
@@ -53,6 +55,10 @@ def expand(
             break
 
         target = pose["point"]
+        score = pose["score"]
+        # if score < 2500:
+            # player.state = State()
+            # return
         best_sy = find_best_shipyard(available_sys, target)
         if not best_sy:
             break
@@ -85,7 +91,7 @@ def find_best_shipyard(available_sys: Set[Shipyard], p: Point) -> Shipyard:
 def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
     board = player.board
 
-    kore_sigma = 5
+    kore_sigma = 4
     g = create_scorer(kore_sigma)
 
     def closer_bonus(point_to_closest_sy, x, p):
@@ -113,11 +119,25 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         if closest_friendly_sy is None:
             point_to_kore[p] = p.kore
         else:
-            point_to_kore[p] = p.kore * min((0.1 + 0.1 * min_friendly_distance, 1))
+            point_to_kore[p] = p.kore * min((0.1 + 0.2 * min_friendly_distance, 1))
 
     point_to_closest_sy = {}
     for p in board:
         point_to_closest_sy[p] = find_closest_shipyards(player, p, board.all_shipyards)
+
+    # op_shipyard_positions = {
+    #     x.point for x in board.all_shipyards if x.player_id != player.game_id
+    # }
+    # attacking_count = sum(
+    #     x.ship_count for x in player.fleets if x.route.end in op_shipyard_positions
+    # )
+    # my_ship_count = player.ship_count - attacking_count
+    # op_ship_count = max(x.ship_count for x in player.opponents)
+    # my_sy_count = len(player.all_shipyards)
+    # op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
+    # max_exp = 8 if op_sy_count > my_sy_count and my_ship_count >= op_ship_count else 6
+    max_exp = 6
+    # logger.info(f"Max exp {max_exp}")
 
     num_sys = len(player.all_shipyards)
     shipyard_to_scores = defaultdict(list)
@@ -144,7 +164,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
             not closest_sy
             or closest_sy.player_id != player.game_id
             or min_distance < 4
-            or min_distance > 8
+            or min_distance > max_exp
         ):
             continue
 
@@ -159,9 +179,11 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
             3 * player.estimate_board_risk(p, min_friendly_distance + 3 + min_enemy_distance // 2) * (9 - dist_diff)
 
         avg_dist_penalty = 10 * sum(x.distance_from(p) ** 1.5 for x in player.all_shipyards) / num_sys if num_sys else 0
-        # risk = player.estimate_board_risk(p, min_friendly_distance + min_enemy_distance + 3)
-        # help = player.opponents[0].estimate_board_risk(p, min_friendly_distance + min_enemy_distance // 2)
+        risk = player.estimate_board_risk(p, min_friendly_distance + min_enemy_distance + 3)
+        help = player.opponents[0].estimate_board_risk(p, min_friendly_distance + min_enemy_distance // 2) - 50
         # enemy_penalty = max(3 * (risk - help // 2) * 16 / math.sqrt(dist_diff + 1), 0)
+        if risk > help * 1.5:
+            enemy_penalty += max(1000, enemy_penalty)
         # logger.error(f"{p}, {risk}, {help}, {enemy_penalty}")
 
         score = nearby_kore - shipyard_penalty - distance_penalty - enemy_penalty - avg_dist_penalty
@@ -193,21 +215,49 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
     for shipyard, scores in shipyard_to_scores.items():
         if scores:
             shipyard_to_point[shipyard] = max(scores, key=lambda x: x["score"])
-            # scores.sort(key=lambda x: x["score"], reverse=True)
-            # for i in range(0, min(2, len(scores))):
-            #     pose = scores[i]
-            #     logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Nearby kore: {pose['nearby_kore']:.2f} Shipyard: {pose['shipyard_penalty']}, Distance: {pose['distance_penalty']}, Enemy: {pose['enemy_penalty']:.2f}, Avg dist: {pose['avg_dist_penalty']:.2f}")
+            if SHOW_EXPANSIONS:
+                scores.sort(key=lambda x: x["score"], reverse=True)
+                for i in range(0, min(NUM_SHOW_EXPANSIONS, len(scores))):
+                    pose = scores[i]
+                    logger.info(f"Expansion {shipyard.point}->{pose['point']} Score: {pose['score']:.2f} Nearby kore: {pose['nearby_kore']:.2f} Shipyard: {pose['shipyard_penalty']}, Distance: {pose['distance_penalty']}, Enemy: {pose['enemy_penalty']:.2f}, Avg dist: {pose['avg_dist_penalty']:.2f}")
 
     return shipyard_to_point
 
 
 def need_more_shipyards(player: Player) -> int:
     board = player.board
+
+    op_shipyard_positions = {
+        x.point for x in board.all_shipyards if x.player_id != player.game_id
+    }
+    attacking_count = sum(
+        x.ship_count for x in player.fleets if x.route.end in op_shipyard_positions
+    )
+    avail_sy_count = player.ship_count - attacking_count
+    if avail_sy_count < 100:
+        return 0
+
+    my_sy_count = len(player.all_shipyards)
+    op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
+
+    my_ship_count = avail_sy_count
+    op_ship_count = max(x.ship_count for x in player.opponents)
+
+    op_stockpile = sum(x.ship_count for x in player.opponents[0].shipyards)
+    if op_stockpile > op_ship_count * 0.5:
+        logger.info(f"Enemy stockpiling. Do not expand")
+        if isinstance(player.state, Expansion):
+            logger.info(f"Exiting expansion")
+            player.state = State()
+        return 0
+
+    if my_sy_count * 75 > my_ship_count:
+        return 0
+
     if isinstance(player.state, Expansion):
         return True
-
-    if player.ship_count < 100:
-        return 0
+    if player.state.__repr__() != "State":
+        return False
 
     fleet_distance = []
     for sy in player.all_shipyards:
@@ -219,7 +269,7 @@ def need_more_shipyards(player: Player) -> int:
 
     mean_fleet_distance = sum(fleet_distance) / len(fleet_distance)
 
-    shipyard_production_capacity = player.shipyard_production_capacity
+    shipyard_production_capacity = player.adj_shipyard_production_capacity
 
     steps_left = board.steps_left
     if steps_left > 100:
@@ -231,16 +281,7 @@ def need_more_shipyards(player: Player) -> int:
     else:
         scale = 1000
 
-    my_sy_count = len(player.all_shipyards)
-    op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
-
-    my_ship_count = player.ship_count
-    op_ship_count = max(x.ship_count for x in player.opponents)
-
-    if my_sy_count * 50 > my_ship_count:
-        return 0
-
-    # if my_sy_count > op_sy_count and my_ship_count < op_ship_count + 25:
+    # if my_sy_count != 1 and my_sy_count >= op_sy_count and my_ship_count < op_ship_count - 25:
     #     return 0
 
     # needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance
@@ -250,8 +291,19 @@ def need_more_shipyards(player: Player) -> int:
     # if my_sy_count < op_sy_count and op_sy_count <= 5:
     #     return 1
 
+    # mean_fleet_distance = max(mean_fleet_distance, 8)
     logger.info(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
     needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance
+    # ship_count_needed = my_ship_count > my_sy_count * 150
+    # kore_needed = 5 * shipyard_production_capacity * 10
+    # logger.info(f"Needed: {ship_count_needed}, {150 * shipyard_production_capacity}")
+    # needed = player.kore > kore_needed
+    # needed = needed or my_sy_count * 150 > my_ship_count
+
+    if my_sy_count == 1 and my_ship_count >= 150:
+        needed = True
+        logger.info(f"Lots of ships for first expansion")
+
     if not needed:
         return 0
 

@@ -1,5 +1,4 @@
 import os
-import random
 from typing import List, Tuple
 from math import pi, exp
 
@@ -175,7 +174,7 @@ def gaussian(x: float, mu: float, sigma: float):
     return 1 / (sigma * (2 * pi) ** 0.5) * exp(-0.5 * (x - mu) ** 2 / sigma ** 2)
 
 
-def create_scorer(sigma: float):
+def create_scorer(sigma: float, mu: float = 0):
     mid = gaussian(0, 0, sigma)
     mid1 = gaussian(0, 0, 2 * sigma)
     mid2 = gaussian(0, 0, 3 * sigma)
@@ -186,17 +185,17 @@ def create_scorer(sigma: float):
         #     return gaussian(x.distance_from(p), 0, 3 * sigma) / mid2
         # if dx == 1 or dy == 1:
         #     return gaussian(x.distance_from(p), 0, 2 * sigma) / mid1
-        return gaussian(x.distance_from(p), 0, sigma) / mid
+        return gaussian(x.distance_from(p), mu, sigma) / mid
     return g
 
 
-def _spawn(agent: Player, shipyard: Shipyard):
+def _spawn(agent: Player, shipyard: Shipyard, dont_launch: bool = True):
     num_ships_to_spawn = min(
         int(agent.available_kore() // agent.board.spawn_cost),
         shipyard.max_ships_to_spawn,
     )
     if num_ships_to_spawn:
         shipyard.action = Spawn(num_ships_to_spawn)
-    else:
+    elif dont_launch:
         shipyard.action = DontLaunch()
     return num_ships_to_spawn

@@ -102,15 +102,29 @@ class DontLaunch(DoNothing):
 
 
 class AllowMine(DoNothing):
-    def __init__(self, max_distance: int = 15):
+    def __init__(self, max_distance: int = 15, target: Point = None, max_time: int = 30):
         self.max_distance = max_distance
+        self.max_time = max_time
+        self.target = target
 
     def __repr__(self):
-        return f"AllowMine {self.max_distance}"
+        return f"AllowMine {self.max_distance} {self.target} {self.max_time}"
 
     def to_str(self):
         return NotImplementedError
 
+class HailMary(DoNothing):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return f"HailMary"
+
+    def to_str(self):
+        return NotImplementedError
+
+    def __nonzero__(self):
+        return False
 
 class BoardPath:
     max_length = 32
@@ -347,6 +361,9 @@ class Shipyard(PositionObj):
         self._blocked_dirs_at_time = None
         self._reserved_ship_count = 0
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self._game_id}, position={self._point} ship_count={self._ship_count})"
+
     @property
     def turns_controlled(self):
         return self._turns_controlled
@@ -404,6 +421,8 @@ class Shipyard(PositionObj):
         shipyard_reinforcements = defaultdict(int)
         for f in self.incoming_allied_fleets:
             shipyard_reinforcements[f.eta] += f.ship_count
+        for f in self.incoming_hostile_fleets:
+            shipyard_reinforcements[f.eta] -= f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
@@ -440,6 +459,8 @@ class Shipyard(PositionObj):
             self._blocked_dirs_at_time = self._get_blocked_dirs_at_time()
         plans = self.point.get_plans_through([point])
         for p in plans:
+            if len(p.paths) == 0:
+                continue
             if p.paths[0] not in self._blocked_dirs_at_time[time]:
                 return True
         return False
@@ -543,6 +564,8 @@ class FutureShipyard(PositionObj):
             # FutureShipyard considers its own fleet as incoming
             if f.game_id != self.game_id:
                 shipyard_reinforcements[f.eta] += f.ship_count
+        for f in self.incoming_hostile_fleets:
+            shipyard_reinforcements[f.eta] -= f.ship_count
 
         spawn_cost = board.spawn_cost
         player_kore = player.kore
@@ -602,6 +625,9 @@ class Fleet(PositionObj):
     def __lt__(self, other):
         return other.__gt__(self)
 
+    def __repr__(self):
+        return f"{self.__class__.__name__}(id={self._game_id}, position={self._point}, player={self._player_id}, ship_count={self._ship_count}, kore={self._kore})"
+
     @property
     def ship_count(self):
         return self._ship_count
@@ -650,12 +676,17 @@ class FleetPointer:
         self._paths = []
         self._points = self.points()
         self._build_shipyard = None
+        self.coalesced_fleets = []
 
     def points(self):
         for path in self.obj.route.paths:
             self._paths.append([path.plan.direction, 0])
+            for f in self.coalesced_fleets:
+                f._paths.append([path.plan.direction, 0])
             for point in path.points:
                 self._paths[-1][1] += 1
+                for f in self.coalesced_fleets:
+                    f._paths[-1][1] += 1
                 yield point
 
     def update(self):
@@ -672,7 +703,7 @@ class FleetPointer:
             self.is_active = False
 
     def current_route(self):
-        plan = PlanRoute([PlanPath(d, n) for d, n in self._paths])
+        plan = PlanRoute([PlanPath(d, n) for d, n in self._paths if n > 0 or d == Convert])
         return BoardRoute(self.obj.point, plan)
 
     @property
@@ -688,7 +719,10 @@ class Player(Obj):
         self._start_time = time.time()
         self._board_risk = None
         self._board_risk_not_adj = None
+        self._optimistic_board_risk = None
+        self._optimistic_board_risk_not_adj = None
         self.state = None
+        self.memory = None
 
     @property
     def kore(self):
@@ -697,6 +731,9 @@ class Player(Obj):
     @property
     def kore_reserve(self):
         return self._kore_reserve
+
+    def inc_kore_reserve(self, amount):
+        self._kore_reserve += amount
 
     def set_kore_reserve(self, kore_reserve):
         assert kore_reserve <= self._kore
@@ -776,6 +813,14 @@ class Player(Obj):
     def shipyard_production_capacity(self):
         return sum(x.max_ships_to_spawn for x in self.shipyards)
 
+    @cached_property
+    def avg_shipyard_production_capacity(self):
+        return self.shipyard_production_capacity / max(len(self.shipyards), 1)
+
+    @cached_property
+    def adj_shipyard_production_capacity(self, min_prod: int = 5):
+        return sum(max(min_prod, x.max_ships_to_spawn) for x in self.shipyards)
+
     def actions(self):
         if self.available_kore() < 0:
             logger.warning("Negative balance. Some ships will not spawn.")
@@ -826,39 +871,59 @@ class Player(Obj):
 
         return power
 
+    def estimate_optimistic_power_for_point_at_time(self, point: Point, time: int) -> int:
+        if time < 0:
+            return 0
+
+        power = max(
+            ((sy.estimate_shipyard_power(time - sy.distance_from(point)) - sy.ship_count)
+            for sy in self.all_shipyards),
+            default=0
+        )
+
+        return power
+
     def is_board_risk_worth(self, risk: int, num_ships: int, sy: Shipyard) -> bool:
         if risk >= num_ships:
             if self.board.step < 50 or self.ship_count < 50 or \
                 num_ships > 0.2 * self.ship_count or num_ships > 0.5 * sy.estimate_shipyard_power(10):
                 return False
-            return num_ships > risk // 2
+            return num_ships > risk * 0.75
         return True
 
-    def estimate_board_risk(self, p: Point, time: int, max_time: int = 40) -> int:
+    def estimate_board_risk(self, p: Point, time: int, max_time: int = 40, pessimistic: bool = True) -> int:
         if self._board_risk is None:
             self._board_risk, self._board_risk_not_adj = self._estimate_board_risk()
+            self._optimistic_board_risk, self._optimistic_board_risk_not_adj = self._estimate_board_risk(pessimistic=False)
         if time < 0:
             return 0
-        return self._board_risk[p][min(time, max_time)]
+        time = min(time, max_time)
+        return self._board_risk[p][time] if pessimistic else self._optimistic_board_risk[p][time]
 
-    def estimate_board_risk_not_adj(self, p: Point, time: int, max_time: int = 40) -> int:
+    def estimate_board_risk_not_adj(self, p: Point, time: int, max_time: int = 40, pessimistic: bool = True) -> int:
         if self._board_risk is None:
             self._board_risk, self._board_risk_not_adj = self._estimate_board_risk()
+            self._optimistic_board_risk, self._optimistic_board_risk_not_adj = self._estimate_board_risk(pessimistic=False)
         if time < 0:
             return 0
-        return self._board_risk_not_adj[p][min(time, max_time)]
+        time = min(time, max_time)
+        return self._board_risk_not_adj[p][time] if pessimistic else self._optimistic_board_risk_not_adj[p][time]
 
-    def _estimate_board_risk(self, max_time: int = 40) -> Dict[Point, Dict[int, int]]:
+    def _estimate_board_risk(self, max_time: int = 40, pessimistic: bool = True) -> Dict[Point, Dict[int, int]]:
         board = self.board
         opps = self.opponents
         if len(opps) < 1:
             return {}
         opp = opps[0]
+        if pessimistic:
+            func = lambda p, dt: opp.estimate_power_for_point_at_time(p, dt)
+        else:
+            func = lambda p, dt: opp.estimate_optimistic_power_for_point_at_time(p, dt)
 
         point_to_time_to_score = defaultdict(dict)
         for p in board:
             for dt in range(max_time + 1):
-                point_to_time_to_score[p][dt] = opp.estimate_power_for_point_at_time(p, dt)
+                point_to_time_to_score[p][dt] = func(p, dt)
 
         adj_point_to_time_to_score = defaultdict(dict)
         for p in board:
@@ -1067,8 +1132,12 @@ class Board:
                         point_to_fleets[f.point].append(f)
                 for point_fleets in point_to_fleets.values():
                     if len(point_fleets) > 1:
-                        for f in sorted(point_fleets, key=lambda x: x.obj)[:-1]:
+                        sorted_fleets = sorted(point_fleets, key=lambda x: x.obj)
+                        last_fleet = sorted_fleets[-1]
+                        for f in sorted_fleets[:-1]:
                             f.is_active = False
+                            last_fleet.coalesced_fleets.append(f)
+                            f._paths.append([last_fleet._paths[-1][0], 0])
 
             # fleet to fleet
             point_to_fleets = defaultdict(list)

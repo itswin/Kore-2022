@@ -1,4 +1,3 @@
-import random
 import os
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
@@ -98,6 +97,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                 routes.sort(key=lambda route: route.expected_kore(board, num_ships_to_launch))
                 for route in routes:
                     route_points = route.points()
+                    route_points = route_points[:-2] if len(route_points) > 2 else route_points
                     if num_ships_to_launch < route.plan.min_fleet_size():
                         continue
 
@@ -137,7 +137,7 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
         if not attacked:
             if best_candidate_sy is not None:
                 _spawn(agent, best_candidate_sy)
-                logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, distance={best_candidate_time}")
+                logger.info(f"Saving for direct attack {t.point}, {best_candidate_sy.point}->{best_target_point}, time={best_candidate_time}")
             elif adjacent_action is not None:
                 adjacent_attacks.append((adjacent_sy, adjacent_action, adjacent_target_point))
 
@@ -217,11 +217,12 @@ def adjacent_attack(agent: Player, max_distance: int = 10):
             if not routes:
                 continue
 
-            route = random.choice(routes)
             logger.info(
                 f"Adjacent attack {sy.point}->{target_point}, distance={distance}, target_time={target_time}"
             )
-            sy.action = Launch(num_ships_to_send, route)
+            best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_send))
+            sy.action = Launch(num_ships_to_send, best_route)
+
             for fleet in target_fleets:
                 fleets_to_be_attacked.add(fleet)
             break
@@ -314,15 +315,19 @@ def greedy_spawn(agent: Player):
         if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
 
+        if len(shipyard.incoming_allied_fleets) <= 1 and shipyard.ship_count >= 21:
+            continue
+
         if not can_greedy_spawn and \
             shipyard.ship_count > agent.ship_count * 0.2 / len(agent.all_shipyards):
             continue
 
-        num_ships_to_spawn = shipyard.max_ships_to_spawn
-        if int(agent.available_kore() // board.spawn_cost) >= num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
+        num_ships_to_spawn = _spawn(agent, shipyard, False)
+        if not num_ships_to_spawn:
+            continue
 
         ship_count += num_ships_to_spawn
+        logger.info(f"Greedy spawn {shipyard.point} {num_ships_to_spawn}")
         if ship_count > max_ship_count:
             return
 
@@ -345,11 +350,13 @@ def spawn(agent: Player):
 def conservative_save_kore(agent: Player):
     if agent.ship_count > 1.1 * sum(x.ship_count for x in agent.opponents):
         save_kore(agent)
+    if agent.board.steps_left < 10:
+        save_kore(agent)
 
 
 def save_kore(agent: Player):
     board = agent.board
 
     if board.steps_left < 25:
-        agent.set_kore_reserve(min(agent.available_kore(), 1.25 * sum(x.kore for x in agent.opponents)))
+        agent.inc_kore_reserve(min(agent.available_kore(), 1.25 * sum(x.kore for x in agent.opponents)))
         logger.info(f"Saved kore: {agent.kore_reserve}")

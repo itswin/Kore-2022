@@ -1,5 +1,6 @@
+from collections import defaultdict
 import os
-from typing import Dict, Tuple, Set
+from typing import Dict, Tuple, Set, List
 
 IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
@@ -17,6 +18,31 @@ else:
     from .helpers import find_shortcut_routes, is_safety_route_to_convert, _spawn
     from .logger import logger
 
+class Memory:
+    def __init__(self):
+        self.agent = None
+        self.sy_to_turn_attacked = defaultdict(int)
+
+    def __repr__(self):
+        return f"Memory(sy_to_turn_attacked={self.sy_to_turn_attacked})"
+
+    def update_memory(self, agent: Player):
+        self.agent = agent
+        new_sy_to_turn_attacked = defaultdict(int)
+        for sy in agent.shipyards:
+            if sy.incoming_hostile_fleets:
+                new_sy_to_turn_attacked[sy.point] = agent.board.step
+            else:
+
+                new_sy_to_turn_attacked[sy.point] = self.sy_to_turn_attacked[sy.point]
+        self.sy_to_turn_attacked = new_sy_to_turn_attacked
+
+    def recently_attacked_sys(self, turn: int, within_turns: int = 5) -> List[Point]:
+        return [
+            sy
+            for sy in self.agent.shipyards
+            if self.sy_to_turn_attacked[sy.point] + within_turns >= turn
+        ]
 
 class State:
     def __init__(self):
@@ -46,7 +72,7 @@ class CoordinatedAttack(State):
         self._max_timeout = max_timeout
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({self.shipyard_to_launch}, {self.target})"
+        return f"{self.__class__.__name__}({list((sy.point, (power, wait_time)) for (sy, (power, wait_time)) in self.shipyard_to_launch.items())}, {self.target})"
 
     def act(self, agent: Player):
         board = agent.board
@@ -103,15 +129,6 @@ class CoordinatedAttack(State):
     def next_state(self):
         return State()
 
-    def _spawn(self, agent: Player, shipyard: Shipyard):
-        board = agent.board
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost),
-            shipyard.max_ships_to_spawn,
-        )
-        if num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
-
     def is_sy_used(self, sy: Shipyard):
         for shipyard, _ in self.shipyard_to_launch.items():
             if shipyard.game_id == sy.game_id:
@@ -121,28 +138,33 @@ class CoordinatedAttack(State):
 
 
 class PrepCoordinatedAttack(State):
-    def __init__(self, max_time_to_wait: int, target: Point = None):
+    def __init__(self, max_time_to_wait: int, target: Point = None, fraction: float = 0.5):
         super().__init__()
         self.max_time_to_wait = max_time_to_wait
         self.target = target
-        self._half_ships_ready = False
+        self.fraction = fraction
+        self._enough_ships_ready = False
     
     def __repr__(self):
         return f"{self.__class__.__name__}({self.max_time_to_wait})({self.target})"
 
     def act(self, agent: Player):
         self.max_time_to_wait -= 1
+
         ship_count = agent.ship_count
         ships_ready = 0
+        for sy in agent.shipyards:
+            ships_ready += sy.available_ship_count
+        self._enough_ships_ready = ships_ready >= ship_count * self.fraction
+
+        if self.is_finished():
+            return
 
         for sy in agent.shipyards:
             _spawn(agent, sy)
-            ships_ready += sy.available_ship_count
-
-        self._half_ships_ready = ships_ready >= ship_count * 0.5
 
     def is_finished(self):
-        return self.max_time_to_wait <= 0 or self._half_ships_ready
+        return self.max_time_to_wait <= 0 or self._enough_ships_ready
 
     def next_state(self):
         return State()
@@ -167,6 +189,7 @@ class Expansion(State):
         new_shipyard_to_target = {}
 
         min_eta = min((min((x.eta for x in sy.incoming_allied_fleets), default=0) for sy in agent.shipyards), default=0)
+        max_opp_sy_power = max((x.ship_count for x in agent.opponents[0].shipyards), default=0)
 
         for sy, target in self.shipyard_to_target.items():
             found_sy = False
@@ -185,7 +208,8 @@ class Expansion(State):
                 new_shipyard_to_target[sy] = target
                 continue
 
-            if sy.available_ship_count < 63:
+            thresh = 50 if max_opp_sy_power >= 50 else 63
+            if sy.available_ship_count < thresh:
                 logger.info(f"Expansion: {sy.point} has {sy.available_ship_count} and is waiting to launch")
                 new_shipyard_to_target[sy] = target
                 _spawn(agent, sy)
@@ -193,7 +217,7 @@ class Expansion(State):
                     # Workaround to allow mining if no fleets out now.
                     if min_eta == 0:
                         min_eta = 30
-                    sy.action = AllowMine(min_eta // 2)
+                    sy.action = AllowMine(min_eta // 2, sy.point)
                 continue 
 
             target_distance = shipyard.distance_from(target) + 2 * (self.extra_distance)
@@ -208,11 +232,11 @@ class Expansion(State):
                     continue
 
                 plans = shipyard.get_plans_through([p, target])
-                rs = [BoardRoute(shipyard.point, plan) for plan in plans]
+                rs = [BoardRoute(shipyard.point, plan + PlanRoute([PlanPath(Convert)])) for plan in plans]
 
                 for route in rs:
                     if shipyard.available_ship_count < min_ship_count_for_flight_plan_len(
-                        len(route.plan.to_str()) + 1
+                        len(route.plan.to_str())
                     ):
                         continue
 
@@ -227,9 +251,6 @@ class Expansion(State):
 
             if routes:
                 route = max(routes, key=lambda route: (-len(route), route.expected_kore(board, sy.available_ship_count)))
-                route = BoardRoute(
-                    sy.point, route.plan + PlanRoute([PlanPath(Convert)])
-                )
                 logger.info(f"Building new sy {sy.point}->{route.end}")
                 sy.action = Launch(sy.available_ship_count, route)
                 self.self_built_sys.add(target)
@@ -246,15 +267,6 @@ class Expansion(State):
 
     def next_state(self):
         return State()
-
-    def _spawn(self, agent: Player, shipyard: Shipyard):
-        board = agent.board
-        num_ships_to_spawn = min(
-            int(agent.available_kore() // board.spawn_cost),
-            shipyard.max_ships_to_spawn,
-        )
-        if num_ships_to_spawn:
-            shipyard.action = Spawn(num_ships_to_spawn)
 
     def is_sy_used(self, sy: Shipyard):
         for shipyard, _ in self.shipyard_to_target.items():
