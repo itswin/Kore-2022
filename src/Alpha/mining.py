@@ -10,12 +10,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute, Point, ACTION_TO_ORTH_ACTIONS, PlanPath, ACTION_TO_OPPOSITE_ACTION, ALL_DIRECTIONS
-    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine, HailMary
+    from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine, HailMary, DirectAttack
     from helpers import is_intercept_route, find_closest_shipyards, _spawn
     from logger import logger
 else:
     from .geometry import PlanRoute, Point, ACTION_TO_ORTH_ACTIONS, PlanPath, ACTION_TO_OPPOSITE_ACTION, ALL_DIRECTIONS
-    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine, HailMary
+    from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine, HailMary, DirectAttack
     from .helpers import is_intercept_route, find_closest_shipyards, _spawn
     from .logger import logger
 
@@ -44,7 +44,7 @@ def mine(agent: Player, remaining_time: float):
         for fleet in op.fleets:
             op_ship_count.append(fleet.ship_count)
 
-    if board.step < 50 and not op_ship_count and agent.kore > board.spawn_cost:
+    if board.step < 50 and not op_ship_count:
         return
 
     shipyard_count = len(agent.all_shipyards)
@@ -120,7 +120,7 @@ def mine(agent: Player, remaining_time: float):
                 sy_max_dist = sy.action.max_distance
                 forced_destination = sy.action.target
                 max_time = sy.action.max_time
-            else:
+            elif not isinstance(sy.action, DirectAttack):
                 continue
 
         free_ships = sy.available_ship_count
@@ -209,6 +209,13 @@ def mine(agent: Player, remaining_time: float):
                 continue
             if best_route.can_execute():
                 logger.info(f"{sy.point} Mining Route: {best_route.plan}, {score:.2f}, {num_ships_to_launch} > {board_risk}. {optimistic_board_risk}")
+                if isinstance(sy.action, DirectAttack):
+                    attack_score = sy.action.score
+                    if score < attack_score:
+                        logger.info(f"Mining route worse than current attack. {score} < {attack_score}")
+                        continue
+                    else:
+                        logger.info(f"Overriding attack with mining route {best_route.plan}")
                 sy.action = Launch(num_ships_to_launch, best_route)
                 break
             else:

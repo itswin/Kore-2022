@@ -85,6 +85,15 @@ class Launch(_ShipyardAction):
         return create_launch_fleet_command(self.ship_count, self.route.plan.to_str())
 
 
+class DirectAttack(Launch):
+    def __init__(self, ship_count: int, route: "BoardRoute", score: float = 100):
+        super().__init__(ship_count, route)
+        self.score = score
+
+    def __repr__(self):
+        return f"DirectAttack {self.route.plan} score={self.score}"
+
+
 class DoNothing(_ShipyardAction):
     def __repr__(self):
         return "Do nothing"

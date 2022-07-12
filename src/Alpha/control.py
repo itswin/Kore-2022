@@ -5,12 +5,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 # <--->
 if IS_KAGGLE:
     from geometry import PlanRoute
-    from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard
+    from board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard, DirectAttack
     from helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards, _spawn
     from logger import logger
 else:
     from .geometry import PlanRoute
-    from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard
+    from .board import Player, Launch, Spawn, Fleet, FleetPointer, BoardRoute, DontLaunch, Shipyard, DirectAttack
     from .helpers import is_inevitable_victory, find_shortcut_routes, find_closest_shipyards, _spawn
     from .logger import logger
 
@@ -137,14 +137,16 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                         continue
 
                     if is_adjacent_attack:
+                        score = (1.5 * t.expected_kore() + 0.5 * route.expected_kore(board, num_ships_to_launch)) / len(route)
                         adjacent_sy = sy
-                        adjacent_action = Launch(num_ships_to_launch, route)
+                        adjacent_action = DirectAttack(num_ships_to_launch, route, score)
                         adjacent_target_point = target_point
                     else:
+                        score = (2 * t.expected_kore() + 0.5 * route.expected_kore(board, num_ships_to_launch)) / len(route)
                         logger.info(
                             f"Direct attack {sy.point}->{target_point}, distance={target_time}"
                         )
-                        sy.action = Launch(num_ships_to_launch, route)
+                        sy.action = DirectAttack(num_ships_to_launch, route, score)
                         attacked = True
                         break
 
@@ -239,8 +241,9 @@ def adjacent_attack(agent: Player, max_distance: int = 10):
             logger.info(
                 f"Adjacent attack {sy.point}->{target_point}, distance={distance}, target_time={target_time}"
             )
-            best_route = max(routes, key=lambda route: route.expected_kore(board, num_ships_to_send))
-            sy.action = Launch(num_ships_to_send, best_route)
+            best_route = min(routes, key=lambda route: route.expected_kore(board, num_ships_to_send))
+            score = 20 * num_ships_to_send
+            sy.action = DirectAttack(num_ships_to_send, best_route, score)
 
             for fleet in target_fleets:
                 fleets_to_be_attacked.add(fleet)
