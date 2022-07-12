@@ -226,10 +226,6 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
 
 def need_more_shipyards(player: Player) -> int:
     board = player.board
-    if isinstance(player.state, Expansion):
-        return True
-    if player.state.__repr__() != "State":
-        return False
 
     op_shipyard_positions = {
         x.point for x in board.all_shipyards if x.player_id != player.game_id
@@ -240,6 +236,28 @@ def need_more_shipyards(player: Player) -> int:
     avail_sy_count = player.ship_count - attacking_count
     if avail_sy_count < 100:
         return 0
+
+    my_sy_count = len(player.all_shipyards)
+    op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
+
+    my_ship_count = avail_sy_count
+    op_ship_count = max(x.ship_count for x in player.opponents)
+
+    op_stockpile = sum(x.ship_count for x in player.opponents[0].shipyards)
+    if op_stockpile > op_ship_count * 0.5:
+        logger.info(f"Enemy stockpiling. Do not expand")
+        if isinstance(player.state, Expansion):
+            logger.info(f"Exiting expansion")
+            player.state = State()
+        return 0
+
+    if my_sy_count * 75 > my_ship_count:
+        return 0
+
+    if isinstance(player.state, Expansion):
+        return True
+    if player.state.__repr__() != "State":
+        return False
 
     fleet_distance = []
     for sy in player.all_shipyards:
@@ -262,21 +280,6 @@ def need_more_shipyards(player: Player) -> int:
         scale = 100
     else:
         scale = 1000
-
-    my_sy_count = len(player.all_shipyards)
-    op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
-
-    my_ship_count = avail_sy_count
-    op_ship_count = max(x.ship_count for x in player.opponents)
-
-    if my_sy_count * 75 > my_ship_count:
-        return 0
-
-    op_stockpile = sum(x.ship_count for x in player.opponents[0].shipyards)
-    if op_stockpile > op_ship_count * 0.5:
-        if isinstance(player.state, Expansion):
-            player.state = State()
-        return 0
 
     # if my_sy_count != 1 and my_sy_count >= op_sy_count and my_ship_count < op_ship_count - 25:
     #     return 0

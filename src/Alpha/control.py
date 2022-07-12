@@ -315,6 +315,9 @@ def greedy_spawn(agent: Player):
         if shipyard.action and not isinstance(shipyard.action, DontLaunch):
             continue
 
+        if len(shipyard.incoming_allied_fleets) <= 1 and shipyard.ship_count >= 21:
+            continue
+
         if not can_greedy_spawn and \
             shipyard.ship_count > agent.ship_count * 0.2 / len(agent.all_shipyards):
             continue

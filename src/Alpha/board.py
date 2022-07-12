@@ -113,6 +113,18 @@ class AllowMine(DoNothing):
     def to_str(self):
         return NotImplementedError
 
+class HailMary(DoNothing):
+    def __init__(self):
+        pass
+
+    def __repr__(self):
+        return f"HailMary"
+
+    def to_str(self):
+        return NotImplementedError
+
+    def __nonzero__(self):
+        return False
 
 class BoardPath:
     max_length = 32
@@ -664,12 +676,17 @@ class FleetPointer:
         self._paths = []
         self._points = self.points()
         self._build_shipyard = None
+        self.coalesced_fleets = []
 
     def points(self):
         for path in self.obj.route.paths:
             self._paths.append([path.plan.direction, 0])
+            for f in self.coalesced_fleets:
+                f._paths.append([path.plan.direction, 0])
             for point in path.points:
                 self._paths[-1][1] += 1
+                for f in self.coalesced_fleets:
+                    f._paths[-1][1] += 1
                 yield point
 
     def update(self):
@@ -686,7 +703,7 @@ class FleetPointer:
             self.is_active = False
 
     def current_route(self):
-        plan = PlanRoute([PlanPath(d, n) for d, n in self._paths])
+        plan = PlanRoute([PlanPath(d, n) for d, n in self._paths if n > 0 or d == Convert])
         return BoardRoute(self.obj.point, plan)
 
     @property
@@ -1115,8 +1132,12 @@ class Board:
                         point_to_fleets[f.point].append(f)
                 for point_fleets in point_to_fleets.values():
                     if len(point_fleets) > 1:
-                        for f in sorted(point_fleets, key=lambda x: x.obj)[:-1]:
+                        sorted_fleets = sorted(point_fleets, key=lambda x: x.obj)
+                        last_fleet = sorted_fleets[-1]
+                        for f in sorted_fleets[:-1]:
                             f.is_active = False
+                            last_fleet.coalesced_fleets.append(f)
+                            f._paths.append([last_fleet._paths[-1][0], 0])
 
             # fleet to fleet
             point_to_fleets = defaultdict(list)
