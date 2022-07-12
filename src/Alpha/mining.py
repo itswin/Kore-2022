@@ -403,22 +403,20 @@ def find_shipyard_mining_routes(
             last_action = route.last_action()
             for orth in ACTION_TO_ORTH_ACTIONS[first_action]:
                 opp_orth = ACTION_TO_OPPOSITE_ACTION[orth]
-
                 for n in range(1, route.plan.paths[0].num_steps):
-                    plan = PlanRoute([PlanPath(orth, 1), route.plan.paths[0], PlanPath(route.plan.paths[1].direction, n), PlanPath(opp_orth, 1), PlanPath(last_action, route.plan.paths[0].num_steps - 1)])
+                    plan = PlanRoute([PlanPath(orth, 1), route.plan.paths[0], PlanPath(route.plan.paths[1].direction, n), PlanPath(opp_orth, 1), PlanPath(last_action, route.plan.paths[0].num_steps - n)])
                     new_plans.append(plan)
         elif is_flat_rectangle(route):
             # E4NW4S -> E4NW2SW
-            new_plans = []
             for n in range(1, route.plan.paths[0].num_steps):
                 opp_dir = ACTION_TO_OPPOSITE_ACTION[route.plan.paths[1].direction]
-                plan = PlanRoute([route.plan.paths[0], route.plan.paths[1], PlanPath(route.plan.paths[2].direction, n), PlanPath(opp_dir, 1), PlanPath(route.plan.paths[2].direction, route.plan.paths[0].num_steps-1)])
+                plan = PlanRoute([route.plan.paths[0], route.plan.paths[1], PlanPath(route.plan.paths[2].direction, n), PlanPath(opp_dir, 1), PlanPath(route.plan.paths[2].direction, route.plan.paths[0].num_steps - n)])
                 new_plans.append(plan)
 
-            # E4NW4S -> NE4W4S
+            # E4NW4S -> NE4NW4S
             last_action = route.last_action()
             opp_orth = ACTION_TO_OPPOSITE_ACTION[last_action]
-            plan = PlanRoute([PlanPath(opp_orth, 1)] + route.plan.paths[:])
+            plan = PlanRoute([PlanPath(opp_orth, 1)] + route.plan.paths[:-1] + [PlanPath(last_action, route.plan.paths[-1].num_steps + 1)])
             new_plans.append(plan)
 
             # E4NW4S -> E4NWESW
