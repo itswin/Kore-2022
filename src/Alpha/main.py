@@ -92,7 +92,10 @@ def agent(obs, conf):
         memory = a.memory
     except:
         logger.error(traceback.format_exc())
-        exit()
+        prev_state = State()
+        memory = Memory()
+        if not IS_KAGGLE:
+            exit()
 
     if not initialized:
         initialized = True

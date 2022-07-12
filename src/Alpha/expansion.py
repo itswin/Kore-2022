@@ -291,7 +291,7 @@ def need_more_shipyards(player: Player) -> int:
     # if my_sy_count < op_sy_count and op_sy_count <= 5:
     #     return 1
 
-    # mean_fleet_distance = max(mean_fleet_distance, 8)
+    mean_fleet_distance = max(mean_fleet_distance, 5)
     logger.info(f"Need more shipyards {player.kore:.2f}, {scale * shipyard_production_capacity * mean_fleet_distance:.2f}, {shipyard_production_capacity:.2f}, {mean_fleet_distance:.2f}, {scale}")
     needed = player.kore > scale * shipyard_production_capacity * mean_fleet_distance
     # ship_count_needed = my_ship_count > my_sy_count * 150

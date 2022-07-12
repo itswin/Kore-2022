@@ -81,6 +81,12 @@ ACTION_TO_OPPOSITE_ACTION = {
     South: North,
     West: East,
 }
+ACTION_TO_ORTH_ACTIONS = {
+    North: {East, West},
+    East: {North, South},
+    South: {East, West},
+    West: {North, South},
+}
 
 
 def get_opposite_action(action):

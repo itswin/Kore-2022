@@ -243,6 +243,9 @@ class BoardRoute:
     def command_length(self) -> int:
         return len(self.command())
 
+    def first_action(self):
+        return self.paths[0].plan.direction
+
     def last_action(self):
         return self.paths[-1].plan.direction
 
@@ -799,9 +802,12 @@ class Player(Obj):
         """
         time -> point -> dmg
         """
+        sy_points = set(x.point for x in self.board.shipyards)
         time_to_dmg_positions = defaultdict(dict)
         for f in self.fleets:
             for time, point in enumerate(f.route):
+                if point in sy_points:
+                    continue
                 for adjacent_point in point.adjacent_points:
                     point_to_dmg = time_to_dmg_positions[time]
                     if adjacent_point not in point_to_dmg:
