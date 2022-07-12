@@ -396,16 +396,18 @@ def find_shipyard_mining_routes(
     new_plans = []
     for i in range(orig_len):
         route = routes[i]
-        # Target routes of the form E8W
         if is_yoyo(route):
-            # E8W -> NE8W(X)SW
             first_action = route.first_action()
             last_action = route.last_action()
             for orth in ACTION_TO_ORTH_ACTIONS[first_action]:
                 opp_orth = ACTION_TO_OPPOSITE_ACTION[orth]
+                # E8W -> NE8W(X)SW
                 for n in range(1, route.plan.paths[0].num_steps):
                     plan = PlanRoute([PlanPath(orth, 1), route.plan.paths[0], PlanPath(route.plan.paths[1].direction, n), PlanPath(opp_orth, 1), PlanPath(last_action, route.plan.paths[0].num_steps - n)])
                     new_plans.append(plan)
+                # E8W -> E8WSNW
+                plan = PlanRoute([route.plan.paths[0], PlanPath(route.plan.paths[1].direction, 1), PlanPath(orth, 1), PlanPath(opp_orth, 1), PlanPath(last_action, route.plan.paths[0].num_steps - 1)])
+                new_plans.append(plan)
         elif is_flat_rectangle(route):
             # E4NW4S -> E4NW2SW
             for n in range(1, route.plan.paths[0].num_steps):
