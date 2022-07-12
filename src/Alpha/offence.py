@@ -403,6 +403,8 @@ def whittle_attack(agent: Player, step: int,
 
             if routes:
                 best_route = min(routes, key=lambda route: (route.expected_kore(board, num_ships_to_launch), len(route)))
+                if best_route.expected_kore(board, num_ships_to_launch) > 50:
+                    continue
                 logger.info(
                     f"Whittle attack shipyard {sy.point}->{t.point}"
                 )

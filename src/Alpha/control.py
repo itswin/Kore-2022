@@ -73,12 +73,31 @@ def direct_attack(agent: Player, max_distance: int = 10, max_time_to_wait: int =
                 time_diff = target_time - sy.point.distance_from(target_point)
                 is_adjacent_attack = time_diff == 1
                 if time_diff != 0 and time_diff != 1:
+                    power = sy.estimate_shipyard_power(time_diff)
                     if time_diff > 0 and time_diff < max_time_to_wait and \
                         time_diff < best_candidate_time and \
-                        sy.estimate_shipyard_power(time_diff) >= min_ships_to_send:
-                        best_candidate_sy = sy
-                        best_candidate_time = time_diff
-                        best_target_point = target_point
+                        power >= min_ships_to_send:
+                        found_route = False
+                        destination = point_to_closest_shipyard[target_point]
+                        plans = sy.point.get_plans_through([target_point, destination])
+                        routes = [BoardRoute(sy.point, plan) for plan in plans]
+                        routes.sort(key=lambda route: route.expected_kore(board, num_ships_to_launch))
+                        for route in routes:
+                            route_points = route.points()
+                            route_points = route_points[:-2] if len(route_points) > 2 else route_points
+                            board_risk = max(
+                                agent.estimate_board_risk(p, time + 1, pessimistic=False) + 
+                                (t.ship_count if (time + 1) >= target_time else 0)
+                                for time, p in enumerate(route_points)
+                            )
+                            num_ships_to_launch = min(board_risk + 1, power)
+                            if not agent.is_board_risk_worth(board_risk, num_ships_to_launch, sy):
+                                continue
+                            found_route = True
+                        if found_route:
+                            best_candidate_sy = sy
+                            best_candidate_time = time_diff
+                            best_target_point = target_point
                     continue
 
                 if is_adjacent_attack:
@@ -311,15 +330,19 @@ def greedy_spawn(agent: Player):
     ship_count = agent.ship_count
     max_ship_count = _max_ships_to_control(agent)
     can_greedy_spawn = should_greedy_spawn(agent)
+    avg_ship_count = agent.ship_count / max(len(agent.all_shipyards), 1)
     for shipyard in agent.shipyards:
         if shipyard.action and not isinstance(shipyard.action, DontLaunch):
+            continue
+
+        if shipyard.ship_count > avg_ship_count:
             continue
 
         if len(shipyard.incoming_allied_fleets) <= 1 and shipyard.ship_count >= 21:
             continue
 
         if not can_greedy_spawn and \
-            shipyard.ship_count > agent.ship_count * 0.2 / len(agent.all_shipyards):
+            shipyard.ship_count > 0.2 * avg_ship_count:
             continue
 
         num_ships_to_spawn = _spawn(agent, shipyard, False)

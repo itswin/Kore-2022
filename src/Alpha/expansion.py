@@ -125,19 +125,21 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
     for p in board:
         point_to_closest_sy[p] = find_closest_shipyards(player, p, board.all_shipyards)
 
-    # op_shipyard_positions = {
-    #     x.point for x in board.all_shipyards if x.player_id != player.game_id
-    # }
-    # attacking_count = sum(
-    #     x.ship_count for x in player.fleets if x.route.end in op_shipyard_positions
-    # )
-    # my_ship_count = player.ship_count - attacking_count
-    # op_ship_count = max(x.ship_count for x in player.opponents)
-    # my_sy_count = len(player.all_shipyards)
-    # op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
+    op_shipyard_positions = {
+        x.point for x in board.all_shipyards if x.player_id != player.game_id
+    }
+    attacking_count = sum(
+        x.ship_count for x in player.fleets if x.route.end in op_shipyard_positions
+    )
+    my_ship_count = player.ship_count - attacking_count
+    op_ship_count = max(x.ship_count for x in player.opponents)
+    my_sy_count = len(player.all_shipyards)
+    op_sy_count = max(len(x.all_shipyards) for x in player.opponents)
     # max_exp = 8 if op_sy_count > my_sy_count and my_ship_count >= op_ship_count else 6
     max_exp = 6
     # logger.info(f"Max exp {max_exp}")
+
+    first_expansion_behind = op_sy_count == 2 and my_sy_count == 1
 
     num_sys = len(player.all_shipyards)
     shipyard_to_scores = defaultdict(list)
@@ -182,7 +184,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         risk = player.estimate_board_risk(p, min_friendly_distance + min_enemy_distance + 3)
         help = player.opponents[0].estimate_board_risk(p, min_friendly_distance + min_enemy_distance // 2) - 50
         # enemy_penalty = max(3 * (risk - help // 2) * 16 / math.sqrt(dist_diff + 1), 0)
-        if risk > help * 1.5:
+        if risk > help * 1.5 and not first_expansion_behind:
             enemy_penalty += max(1000, enemy_penalty)
         # logger.error(f"{p}, {risk}, {help}, {enemy_penalty}")
 
@@ -209,6 +211,7 @@ def find_best_position_for_shipyards(player: Player) -> Dict[Shipyard, Point]:
         for score in scores:
             score["nearby_kore"] = score["nearby_kore"] * BASELINE_KORE_SCORE / max_kore_score
             # score["enemy_penalty"] = score["enemy_penalty"] * BASELINE_ENEMY_PENALTY / max_enemy_penalty
+            score["enemy_penalty"] = min(score["enemy_penalty"], max(3000, int(0.75 * max_enemy_penalty)))
             score["score"] = score["nearby_kore"] - score["shipyard_penalty"] - score["distance_penalty"] - score["enemy_penalty"] - score["avg_dist_penalty"]
 
     shipyard_to_point = {}

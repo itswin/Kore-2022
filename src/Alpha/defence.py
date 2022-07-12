@@ -61,7 +61,7 @@ def defend_shipyards(agent: Player, self_built_sys: Set[Shipyard]):
 
         # Hail Mary if about to die and no incoming fleets
         immediate_hostile_power = sum(x.ship_count for x in incoming_hostile_fleets if x.eta == 1)
-        if incoming_hostile_time == 1 and not incoming_allied_fleets and num_ships_to_spawn < sy.ship_count + immediate_hostile_power:
+        if incoming_hostile_time == 1 and not incoming_allied_fleets and immediate_hostile_power > sy.ship_count + num_ships_to_spawn:
             logger.info(f"{sy.point} is getting overtaken. Sending hail mary mining fleet")
             sy.action = HailMary()
             continue

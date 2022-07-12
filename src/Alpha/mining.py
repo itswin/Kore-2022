@@ -9,12 +9,12 @@ IS_KAGGLE = os.path.exists("/kaggle_simulations")
 
 # <--->
 if IS_KAGGLE:
-    from geometry import PlanRoute, Point, ACTION_TO_ORTH_ACTIONS, PlanPath, ACTION_TO_OPPOSITE_ACTION
+    from geometry import PlanRoute, Point, ACTION_TO_ORTH_ACTIONS, PlanPath, ACTION_TO_OPPOSITE_ACTION, ALL_DIRECTIONS
     from board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine, HailMary
     from helpers import is_intercept_route, find_closest_shipyards, _spawn
     from logger import logger
 else:
-    from .geometry import PlanRoute, Point, ACTION_TO_ORTH_ACTIONS, PlanPath, ACTION_TO_OPPOSITE_ACTION
+    from .geometry import PlanRoute, Point, ACTION_TO_ORTH_ACTIONS, PlanPath, ACTION_TO_OPPOSITE_ACTION, ALL_DIRECTIONS
     from .board import Player, BoardRoute, Launch, Shipyard, MiningRoute, Board, AllowMine, HailMary
     from .helpers import is_intercept_route, find_closest_shipyards, _spawn
     from .logger import logger
@@ -393,10 +393,12 @@ def find_shipyard_mining_routes(
             route.plan.paths[2].num_steps > 1 and route.start == route.end
 
     orig_len = len(routes)
+    new_plans = []
     for i in range(orig_len):
         route = routes[i]
         # Target routes of the form E8W
         if is_yoyo(route):
+            # E8W -> NE8W(X)SW
             first_action = route.first_action()
             last_action = route.last_action()
             for orth in ACTION_TO_ORTH_ACTIONS[first_action]:
@@ -404,38 +406,57 @@ def find_shipyard_mining_routes(
 
                 for n in range(1, route.plan.paths[0].num_steps):
                     plan = PlanRoute([PlanPath(orth, 1), route.plan.paths[0], PlanPath(route.plan.paths[1].direction, n), PlanPath(opp_orth, 1), PlanPath(last_action, route.plan.paths[0].num_steps - 1)])
-                    wait_time = sy.calc_time_for_ships_for_action(plan.min_fleet_size())
-                    new_route = MiningRoute(departure, plan, wait_time)
-
-                    if new_route.plan.to_str() in route_set:
-                        continue
-
-                    if is_intercept_route(new_route, player, safety):
-                        continue
-
-                    if route.start != route.end:
-                        continue
-                    
-                    routes.append(new_route)
-                    route_set.add(new_route.plan.to_str())
+                    new_plans.append(plan)
         elif is_flat_rectangle(route):
+            # E4NW4S -> E4NW2SW
+            new_plans = []
             for n in range(1, route.plan.paths[0].num_steps):
                 opp_dir = ACTION_TO_OPPOSITE_ACTION[route.plan.paths[1].direction]
                 plan = PlanRoute([route.plan.paths[0], route.plan.paths[1], PlanPath(route.plan.paths[2].direction, n), PlanPath(opp_dir, 1), PlanPath(route.plan.paths[2].direction, route.plan.paths[0].num_steps-1)])
-                wait_time = sy.calc_time_for_ships_for_action(plan.min_fleet_size())
-                new_route = MiningRoute(departure, plan, wait_time)
+                new_plans.append(plan)
 
-                if new_route.plan.to_str() in route_set:
-                    continue
+            # E4NW4S -> NE4W4S
+            last_action = route.last_action()
+            opp_orth = ACTION_TO_OPPOSITE_ACTION[last_action]
+            plan = PlanRoute([PlanPath(opp_orth, 1)] + route.plan.paths[:])
+            new_plans.append(plan)
 
-                if is_intercept_route(new_route, player, safety):
-                    continue
+            # E4NW4S -> E4NWESW
+            opp_dir = ACTION_TO_OPPOSITE_ACTION[route.plan.paths[1].direction]
+            plan = PlanRoute([route.plan.paths[0], route.plan.paths[1], PlanPath(route.plan.paths[2].direction, 1), PlanPath(route.plan.paths[0].direction, 1), PlanPath(opp_dir, 1), PlanPath(route.plan.paths[2].direction, route.plan.paths[0].num_steps)])
+            new_plans.append(plan)
+    
+    # N2W20S
+    for dir in ALL_DIRECTIONS:
+        opp_dir = ACTION_TO_OPPOSITE_ACTION[dir]
+        for orth_dir in ACTION_TO_ORTH_ACTIONS[dir]:
+            for n in range(1,6):
+                plan = PlanRoute([PlanPath(dir, n), PlanPath(orth_dir, 21), PlanPath(opp_dir, n)])
+                new_plans.append(plan)
 
-                if route.start != route.end:
-                    continue
+    # N4WEN
+    for dir in ALL_DIRECTIONS:
+        for orth_dir in ACTION_TO_ORTH_ACTIONS[dir]:
+            opp_orth = ACTION_TO_OPPOSITE_ACTION[orth_dir]
+            for n in range(1,10):
+                plan = PlanRoute([PlanPath(dir, n), PlanPath(orth_dir, 1), PlanPath(opp_orth, 1), PlanPath(dir, n)])
+                new_plans.append(plan)
 
-                routes.append(new_route)
-                route_set.add(new_route.plan.to_str())
+    for plan in new_plans:
+        wait_time = sy.calc_time_for_ships_for_action(plan.min_fleet_size())
+        new_route = MiningRoute(departure, plan, wait_time)
+
+        if new_route.plan.to_str() in route_set:
+            continue
+
+        if is_intercept_route(new_route, player, safety):
+            continue
+
+        if new_route.start != new_route.end:
+            continue
+
+        routes.append(new_route)
+        route_set.add(new_route.plan.to_str())
 
     return routes
 
