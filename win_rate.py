@@ -2,6 +2,7 @@ from kaggle_environments import make
 from tqdm.contrib.concurrent import process_map
 import numpy as np
 from datetime import datetime
+import traceback
 
 from src.Alpha.multi import make_agent as Alpha
 from src.Beta.multi import make_agent as Beta
@@ -18,25 +19,28 @@ def runs(i):
     agenta = Alpha()
     agentb = Beta()
     env.run([agenta, agentb])
-    rewards = [x["reward"] for x in env.steps[-1]]
-    scores1, scores2 = rewards[0], rewards[1]
-
-    if scores2 == None:
-        wins = True
-    elif scores1 == None:
-        wins = False
-    else:
-        wins = scores1 > scores2
-
-    if show_result_per_game:
-        what = 'Win' if wins==1 else 'Lost'
-        print(f'Game no. #{i} : {what} with score {scores1:.0f} vs {scores2:.0f}')
 
     now = datetime.now()
     file_name = now.strftime(f"games/game{i}_%m-%d_%H:%M:%S.html")
     game_out = env.render(mode="html")
     with open(file_name, "w") as f:
         f.write(game_out)
+
+    rewards = [x["reward"] for x in env.steps[-1]]
+    scores1, scores2 = rewards[0], rewards[1]
+
+    if scores2 == None:
+        wins = True
+        raise Exception(f"Error for P2: No rewards in game no. {i}")
+    elif scores1 == None:
+        wins = False
+        raise Exception(f"Error for P1: No rewards in game no. {i}")
+    else:
+        wins = scores1 > scores2
+
+    if show_result_per_game:
+        what = 'Win' if wins==1 else 'Lost'
+        print(f'Game no. #{i} : {what} with score {scores1:.0f} vs {scores2:.0f}')
 
     return scores1, scores2, wins
 
