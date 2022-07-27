@@ -6,11 +6,16 @@ Beta is the bot I tested against. I would update it occasionally to match Alpha.
 KoreBeta is the version aDg4b submitted to win the Beta competition.\
 Miner is a simple miner from the discussions page. I only used it for debugging.
 
-Here lies a quick game overview and my postmortem for the competition.
+Here lies a quick game overview and my postmortem for the competition. My postmortem is also posted on Kaggle. Its discussion is located [here](https://www.kaggle.com/competitions/kore-2022/discussion/339979).
 
 ## Game Overview
-Kore-2022 is a turn-based game played on a 21x21 tiled board, where your objective is to collect the most kore, your primary resource, by round 400 or destroy your opponent before that. There are two basic units: ships and shipyards. Shipyards are the main source of control, from them you can either spawn new ships at the cost of kore or launch a fleet of ships. Fleets launched follow a specified flight plan and collect resources from each tile that they pass over. Larger fleets can have longer flight plans, and also collect (slightly) more kore than smaller ones. New shipyards can be created at the expense of a number of a ships. For a more in depth discussion of the game's rules, see [here](https://www.kaggle.com/competitions/kore-2022/overview/kore-rules).
+![Kore gameplay](kore-gameplay.gif)
 
+Visualization by [Tong Hui Kang](https://www.kaggle.com/competitions/kore-2022/discussion/320987).
+
+Kore-2022 is a turn-based game played on a 21x21 tiled board, where your objective is to collect the most kore, your primary resource, by round 400 or destroy your opponent before that. The overall theme is that you must calculate many steps ahead, as the effects of any single action often are not immediately apparent. There are two basic units: ships and shipyards. Shipyards are the main source of control, from them you can either spawn new ships at the cost of kore or launch a fleet of ships. Fleets launched follow a specified flight plan and collect resources from each tile that they pass over. Larger fleets can have longer flight plans, and also collect (slightly) more kore than smaller ones. New shipyards can be created at the expense of a number of a ships. For a more in depth discussion of the game's rules, see [here](https://www.kaggle.com/competitions/kore-2022/overview/kore-rules). 
+
+# Postmortem
 ## Preface
 First of all, I want to thank the Kaggle team for hosting a lovely competition. I greatly enjoyed seeing the strategies develop over time and reading about people's thoughts about the game on the forums. I wish I had more time to work on my agent, as there was so much more to be done, but I look forward to future simulation competitions on Kaggle! Here are also a few people I'd like to thank in particular:
 - [aDg4b](https://www.kaggle.com/egrehbbt), for posting his amazing [code](https://www.kaggle.com/competitions/kore-2022-beta/discussion/317737) from the beta competition. I used it as a jumping off point and it saved me more time than I could ever imagine.
@@ -18,7 +23,7 @@ First of all, I want to thank the Kaggle team for hosting a lovely competition. 
 - [Bovard](https://www.kaggle.com/bovard), for posting the competition on the Battlecode discord, as I probably wouldn't have found it otherwise.
 - [kirderf](https://www.kaggle.com/kirderf) and [Jarosław Bogusz](https://www.kaggle.com/jaroslawbogusz) for their local evaluation and replay scripts respectively.
 
-I'm new to Kaggle and a Battlecoder by heart, so I'm not much of an ML person myself and took a rules-based approach to this competition. If you don't know what [Battlecode](https://battlecode.org/) is, definitely check out Stone Tao's survey of AI programming challenges [here](https://www.stoneztao.com/blog/posts/ai-challenge-survey/). But, in short, it's another AI real-time-strategy game that I treat like a full time job in the (seemingly short) month that it runs.
+I'm a Battlecoder by heart and new to Kaggle, so I took a rules-based approach to this competition. If you don't know what [Battlecode](https://battlecode.org/) is, definitely check out Stone Tao's survey of AI programming challenges [here](https://www.stoneztao.com/blog/posts/ai-challenge-survey/). But, in short, it's another AI real-time-strategy game that I treat like a full time job in the (seemingly short) month that it runs.
 
 ## Overview
 At a high level, I followed the same basic decision sequence layed out in aDg4b's Beta solution. Here's an overview of my bot and my thoughts throughout the competition. Where I can, I'll try to give some reasoning behind some of the decisions I made, or talk about things that I tried but didn't end up working out for me.
@@ -52,7 +57,7 @@ Choosing expansion spots is another challenge. Here's a list of each of the fact
 
 **Kore:** I evaluated kore at nearby tiles and summed them up, using this as the driving force behind the value of a particular expansion spot. I modified the perceived kore on a tile based on a few things:
 - Kore is raised to the power of 1.1, serving to give bonus to large kore stockpiles that will give quick turnover after the expansion. This helps mitigate the immediate 50 ship penalty when defending a quick attack.
-- A gaussian distribution decreasing the value of a tile based on the distance from the new chosen shipyard position. I tried out different distributions here that might synergize with the mining routes I expected to launch, but they didn't pan out.
+- A gaussian distribution decreasing the value of a tile based on the distance from the new chosen shipyard position. I tried out different distributions here that might synergize with the mining routes I expected to launch, but they didn't seem to help much.
 - A linear penalty decreasing the value of tiles close to other friendly shipyards. This avoids creating shipyards too close together.
 - A bonus multiplicative factor that acted to incentivize taking space away from the opponent. Tiles that were hotly contested (read: were roughly equidistant from enemy and friendly shipyards) were given a bonus if the new spot decreased the distance of the nearest friendly shipyard.
 
